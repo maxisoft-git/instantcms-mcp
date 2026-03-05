@@ -1,0 +1,25 @@
+{
+  "name": "instantcms-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for InstantCMS addon and template development",
+  "main": "dist/index.js",
+  "bin": {
+    "instantcms-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "inspector": "npx @modelcontextprotocol/inspector tsx src/index.ts"
+  },
+  "keywords": ["mcp", "instantcms", "cms"],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@types/node": "^25.3.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
