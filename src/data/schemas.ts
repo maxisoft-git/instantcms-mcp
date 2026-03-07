@@ -67,9 +67,13 @@ export const controllerDirectoryLayout = `
 /system/languages/ru/controllers/{name}/{name}.php
 /system/languages/en/controllers/{name}/{name}.php
 
-ШАБЛОНЫ (в папке шаблона, НЕ в контроллере!):
-/templates/{template_name}/controllers/{name}/{action}.tpl.php
-/templates/admincoreui/controllers/{name}/{action}.tpl.php  ← для бэкенда
+ШАБЛОНЫ (в папке frontend-темы, НЕ в контроллере!):
+/templates/{theme_name}/controllers/{name}/{action}.tpl.php           ← фронтенд-экшен
+/templates/{theme_name}/controllers/{name}/backend/{action}.tpl.php  ← бэкенд-экшен (подпапка backend/)
+/templates/{theme_name}/controllers/{name}/widgets/{w}/{w}.tpl.php   ← виджет контроллера
+
+ВАЖНО: бэкенд-шаблоны ВСЕГДА в папке frontend-темы (modern/), НЕ в admincoreui/
+        admincoreui/ предоставляет ТОЛЬКО layout-оболочку (navbar/sidebar через admin.tpl.php)
 
 ПАКЕТ ДЛЯ УСТАНОВКИ ЧЕРЕЗ МЕНЕДЖЕР ДОПОЛНЕНИЙ:
 {name}.zip
@@ -1057,39 +1061,45 @@ class formWidget{Name}ListOptions extends cmsForm {
 // СТРУКТУРА ШАБЛОНА (ТЕМЫ)
 // ─────────────────────────────────────────────────────────────────────────────
 export const templateStructure = {
-  description: "Структура шаблона (темы) для InstantCMS. Фронтенд: /templates/{name}/, бэкенд: /templates/admincoreui/.",
-  install_note: "Шаблоны находятся в /templates/, а НЕ в /system/templates/",
+  description: "Структура шаблона (темы) для InstantCMS. Все шаблоны в /templates/{theme}/. Бэкенд-шаблоны контроллеров: /templates/{theme}/controllers/{name}/backend/{action}.tpl.php. Тема admincoreui предоставляет только layout-оболочку (navbar/sidebar), а НЕ шаблоны контента контроллеров.",
+  install_note: "Шаблоны находятся в /templates/, а НЕ в /system/templates/. Бэкенд-шаблоны в подпапке backend/ внутри папки контроллера frontend-темы.",
   directory_layout: `
 /templates/{theme_name}/
 ├── manifest.php                          ← ОБЯЗАТЕЛЬНО: метаданные шаблона
 ├── main.tpl.php                          ← ОБЯЗАТЕЛЬНО: главный макет HTML
-├── admin.tpl.php                         ← макет для страниц типа "только контент"
 ├── options.form.php                      ← форма настроек шаблона в админке
 ├── options.css.php                       ← динамический CSS из настроек
 ├── scheme.php                            ← цветовые схемы
-├── assets/                               ← статические ресурсы
-├── css/                                  ← стили
+├── scss/                                 ← SCSS-исходники (style_middleware => 'scss')
+├── css/                                  ← скомпилированные стили
 │   ├── main.css
-│   ├── theme-layout.css
-│   ├── theme-gui.css
 │   └── ...
 ├── js/                                   ← скрипты
 │   ├── main.js
 │   └── ...
 ├── images/                               ← изображения шаблона
-├── widgets/                              ← шаблоны виджетов
-│   ├── wrapper.tpl.php                   ← обёртка виджета
+├── assets/                               ← прочие статические ресурсы
+├── layout_childs/                        ← фрагменты для динамического layout (is_dynamic_layout=true)
+│   └── main_scheme.tpl.php               ← схема рядов/колонок Bootstrap; вызывается через renderLayoutChild()
+├── widgets/                              ← глобальные шаблоны виджетов
+│   ├── wrapper.tpl.php                   ← стандартная обёртка виджета
+│   ├── wrapper_tabbed.tpl.php
+│   ├── wrapper_plain.tpl.php
 │   └── {widget_type}/
 │       └── {widget_name}.tpl.php
-└── controllers/                          ← шаблоны контроллеров
-    ├── {controller_name}/
-    │   ├── index.tpl.php
-    │   ├── view.tpl.php
-    │   └── ...
-    └── content/
-        ├── default_list.tpl.php
-        ├── default_item.tpl.php
-        └── ...
+└── controllers/                          ← шаблоны контроллеров (переопределяют системные)
+    └── {controller_name}/
+        ├── index.tpl.php                 ← фронтенд: экшен index
+        ├── view.tpl.php                  ← фронтенд: экшен view
+        ├── ...                           ← прочие фронтенд-экшены
+        ├── backend/                      ← БЭКЕНД-шаблоны (НЕ в admincoreui/!)
+        │   ├── index.tpl.php             ← бэкенд: дашборд-страница
+        │   ├── items.tpl.php             ← бэкенд: список (генерируется listgrid)
+        │   ├── items_add.tpl.php         ← бэкенд: форма добавления/редактирования
+        │   └── ...
+        └── widgets/                      ← шаблоны виджетов этого контроллера
+            └── {widget_name}/
+                └── {widget_name}.tpl.php
 `,
   widget_positions: `
 Стандартные позиции виджетов (вызов в main.tpl.php):
@@ -1108,24 +1118,76 @@ export const templateStructure = {
 `,
   template_variables: `
 Переменные доступные в .tpl.php шаблонах:
-  $this->title()          — заголовок страницы (string)
-  $this->body()           — основной контент (HTML)
-  $this->widgets($pos)    — виджеты позиции
-  $this->breadcrumbs()    — хлебные крошки
-  $this->head()           — дополнительные теги для <head>
-  $this->bottom()         — скрипты перед </body>
-  $config                 — объект конфигурации сайта
-  $cms_user               — текущий пользователь (cmsUser)
-  cmsUser::isAdmin()      — проверка на администратора
-  cmsUser::isLogged()     — проверка авторизации
-  $device_type            — 'mobile' или 'desktop'
+  $this->title()                    — заголовок страницы (метод с (), не свойство!)
+  $this->body()                     — основной контент (HTML)
+  $this->widgets($pos)              — вывод виджетов позиции
+  $this->widgetsInHtml($pos, $w)    — виджеты позиции в HTML-обёртке
+  $this->hasWidgetsOn($pos)         — проверка наличия виджетов на позиции
+  $this->breadcrumbs()              — хлебные крошки
+  $this->head(true, ...)            — теги <head>; первый параметр = include_css_js
+  $this->bottom()                   — скрипты перед </body>
+  $this->linkCSS('css/main.css')    — подключение CSS файла темы
+  $this->linkJS('js/main.js')       — подключение JS файла темы
+  $this->addMainTplCSSName(...)     — добавить CSS класс к <html>/<body>
+  $this->addMainTplJSName(...)      — добавить JS класс
+  $this->renderLayoutChild($name, $vars) — рендер фрагмента из layout_childs/
+  $this->href_to($action, $params)  — формирование URL к экшену контроллера
+  $config                           — объект конфигурации сайта
+  $cms_user                         — текущий пользователь (cmsUser)
+  cmsUser::isAdmin()                — проверка на администратора
+  cmsUser::isLogged()               — проверка авторизации
+  $device_type                      — 'mobile' или 'desktop'
+  LANG_CODE                         — код активного языка (ru, en, ...)
 `,
+  inheritance: {
+    description: "Система наследования шаблонов через manifest.php. Тема может наследовать файлы из других тем.",
+    chain_resolution: "Алгоритм: setInheritNames() строит [default, ...inherited, current] → reverses → current проверяется ПЕРВЫМ. Первое найденное совпадение выигрывает.",
+    admincoreui_role: "admincoreui — ТОЛЬКО layout-оболочка для бэкенда (admin.tpl.php содержит navbar + sidebar Bootstrap 4 CoreUI). Шаблоны контента контроллеров находятся в frontend-теме (modern/controllers/{name}/backend/).",
+    manifest_inherit_example: `<?php
+// templates/modern/manifest.php
+return [
+    'inherit' => ['admincoreui'],       // наследовать файлы из admincoreui
+    'title'   => 'Modern',
+    'properties' => [
+        'vendor'           => 'bootstrap4',
+        'style_middleware' => 'scss',       // SCSS компиляция
+        'has_options'      => true,
+        'is_dynamic_layout' => true,        // использует layout_childs/
+        'is_backend'       => false,        // НЕ backend-тема
+        'is_frontend'      => true,
+        'html_attr'        => ['class' => 'min-vh-100']
+    ]
+];
+
+// templates/admincoreui/manifest.php
+return [
+    'inherit' => ['modern'],            // наследовать из modern (взаимное наследование!)
+    'title'   => 'CoreUI',
+    'properties' => [
+        'has_options'      => false,
+        'is_dynamic_layout' => false,
+        'is_backend'       => true,         // backend-тема (layout для админки)
+        'is_frontend'      => false
+    ]
+];`,
+    dynamic_layout: `// is_dynamic_layout = true (в manifest.php)
+// В main.tpl.php вместо явных вызовов $this->widgets('left-top') и т.д.:
+$this->renderLayoutChild('scheme', ['rows' => $rows]);
+// Шаблон layout_childs/main_scheme.tpl.php получает $rows (массив рядов/колонок)
+// и итерирует их, выводя виджеты по позициям Bootstrap-сеткой`,
+    inheritance_chain_example: [
+      "modern: 'inherit' => ['admincoreui'] — frontend-тема, наследует layout из admincoreui",
+      "admincoreui: 'inherit' => ['modern'] — backend layout, наследует компоненты из modern",
+      "Поиск файла шаблона: modern → admincoreui → default (current FIRST)"
+    ]
+  },
   required_files: [
     {
       path: "manifest.php",
       description: "Метаданные шаблона. Возвращает массив с title, author, properties.",
       template: `<?php
 return [
+    // 'inherit' => ['admincoreui'],   // наследование: modern наследует из admincoreui
     'title'  => 'My Theme',
     'author' => [
         'name' => 'Author Name',
@@ -1133,12 +1195,14 @@ return [
         'help' => 'https://docs.example.com'
     ],
     'properties' => [
-        'has_options'                => true,    // есть форма настроек
-        'has_profile_themes_support' => false,   // профильные темы
+        'has_options'                => true,    // есть форма настроек шаблона
+        'has_profile_themes_support' => false,   // поддержка профильных тем
         'has_profile_themes_options' => false,
-        'is_dynamic_layout'          => false,   // динамическая компоновка
-        'is_backend'                 => false,   // шаблон для бэкенда
-        'is_frontend'                => true     // шаблон для фронтенда
+        'is_dynamic_layout'          => false,   // true = использует layout_childs/ + renderLayoutChild()
+        'is_backend'                 => false,   // true = шаблон для admin-layout (как admincoreui)
+        'is_frontend'                => true,    // шаблон доступен для фронтенда
+        'vendor'                     => 'bootstrap4',  // CSS-фреймворк
+        'style_middleware'           => 'scss'   // 'scss' если используется SCSS компиляция
     ]
 ];`
     },
@@ -1202,15 +1266,21 @@ return [
     { path: "images/", description: "Изображения шаблона" }
   ],
   controller_templates: {
-    description: "Шаблоны для конкретных контроллеров. Переопределяют системные шаблоны.",
-    path_pattern: "/templates/{theme}/controllers/{controller}/{action}.tpl.php",
+    description: "Шаблоны для конкретных контроллеров. Переопределяют системные шаблоны. Фронтенд и бэкенд — в одной папке frontend-темы.",
+    frontend_path: "/templates/{theme}/controllers/{name}/{action}.tpl.php",
+    backend_path: "/templates/{theme}/controllers/{name}/backend/{action}.tpl.php",
+    widget_path: "/templates/{theme}/controllers/{name}/widgets/{widget_name}/{widget_name}.tpl.php",
+    critical_note: "ВАЖНО: бэкенд-шаблоны в подпапке backend/ внутри папки frontend-темы (modern/), НЕ в папке admincoreui/!",
     examples: [
-      "controllers/content/default_list.tpl.php — список материалов",
-      "controllers/content/default_item.tpl.php — просмотр материала",
-      "controllers/users/profile.tpl.php — профиль пользователя",
-      "controllers/{name}/index.tpl.php — главная страница вашего дополнения"
+      "templates/modern/controllers/content/default_list.tpl.php — список материалов (фронтенд)",
+      "templates/modern/controllers/content/default_item.tpl.php — просмотр материала (фронтенд)",
+      "templates/modern/controllers/users/profile.tpl.php — профиль пользователя (фронтенд)",
+      "templates/modern/controllers/{name}/index.tpl.php — главная страница дополнения (фронтенд)",
+      "templates/modern/controllers/{name}/backend/index.tpl.php — дашборд бэкенда",
+      "templates/modern/controllers/{name}/backend/items.tpl.php — список (бэкенд)",
+      "templates/modern/controllers/{name}/widgets/{wname}/{wname}.tpl.php — виджет"
     ],
-    note: "Шаблоны в папке темы ПЕРЕОПРЕДЕЛЯЮТ системные шаблоны из /system/controllers/"
+    note: "Шаблоны в папке темы ПЕРЕОПРЕДЕЛЯЮТ системные шаблоны из /system/controllers/. Если файл не найден в теме — ищется в inherited темах, затем в default."
   }
 };
 

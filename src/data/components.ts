@@ -1279,5 +1279,160 @@ function grid_items($controller) {
 }`
       }
     ]
+  },
+  {
+    name: "cmsTemplate",
+    class: "cmsTemplate",
+    description: "Движок шаблонов InstantCMS. Доступен как $this в .tpl.php файлах. Предоставляет методы для вывода контента, CSS/JS, виджетов, навигации и динамического layout.",
+    access: "$this — в .tpl.php файлах шаблона",
+    methods: [
+      {
+        name: "title",
+        signature: "title(): string",
+        description: "Возвращает заголовок страницы. МЕТОД с (), не свойство!",
+        parameters: [],
+        return_type: "string",
+        example: `<title><?= $this->title() ?></title>`
+      },
+      {
+        name: "body",
+        signature: "body(): string",
+        description: "Возвращает основной HTML-контент страницы (результат экшена контроллера).",
+        parameters: [],
+        return_type: "string",
+        example: `<main class="content"><?= $this->body() ?></main>`
+      },
+      {
+        name: "head",
+        signature: "head(bool $include_css_js = true, ...): string",
+        description: "Возвращает теги для вставки в <head>: мета-теги, CSS, JS.",
+        parameters: [
+          { name: "$include_css_js", type: "bool", description: "Включить CSS/JS теги (default: true)", required: false, default: "true" }
+        ],
+        return_type: "string",
+        example: `<head>
+    <meta charset="utf-8">
+    <title><?= $this->title() ?></title>
+    <?= $this->head(true) ?>
+</head>`
+      },
+      {
+        name: "bottom",
+        signature: "bottom(): string",
+        description: "Возвращает JS-скрипты для вставки перед </body>.",
+        parameters: [],
+        return_type: "string",
+        example: `    <?= $this->bottom() ?>
+</body>`
+      },
+      {
+        name: "widgets",
+        signature: "widgets(string $position): string",
+        description: "Выводит виджеты на указанной позиции.",
+        parameters: [
+          { name: "$position", type: "string", description: "Имя позиции: header, top, left-top, left-bottom, right-top, right-center, right-bottom, footer", required: true }
+        ],
+        return_type: "string",
+        example: `<?= $this->widgets('header') ?>
+<?= $this->widgets('right-top') ?>
+<?= $this->widgets('footer') ?>`
+      },
+      {
+        name: "hasWidgetsOn",
+        signature: "hasWidgetsOn(string|array $positions): bool",
+        description: "Проверяет наличие виджетов на позиции (или массиве позиций).",
+        parameters: [
+          { name: "$positions", type: "string|array", description: "Позиция или массив позиций", required: true }
+        ],
+        return_type: "bool",
+        example: `<?php if ($this->hasWidgetsOn('right-top')): ?>
+    <aside class="sidebar">
+        <?= $this->widgets('right-top') ?>
+    </aside>
+<?php endif ?>`
+      },
+      {
+        name: "widgetsInHtml",
+        signature: "widgetsInHtml(string $position, string $wrapper = ''): void",
+        description: "Выводит виджеты позиции в HTML-обёртке.",
+        parameters: [
+          { name: "$position", type: "string", description: "Позиция виджетов", required: true },
+          { name: "$wrapper", type: "string", description: "HTML-обёртка (класс или тег)", required: false }
+        ],
+        return_type: "void",
+        example: `<?php $this->widgetsInHtml('left-top', 'sidebar-section') ?>`
+      },
+      {
+        name: "breadcrumbs",
+        signature: "breadcrumbs(): string",
+        description: "Возвращает HTML хлебных крошек.",
+        parameters: [],
+        return_type: "string",
+        example: `<nav aria-label="breadcrumb"><?= $this->breadcrumbs() ?></nav>`
+      },
+      {
+        name: "linkCSS",
+        signature: "linkCSS(string $path): string",
+        description: "Возвращает <link> тег для CSS файла из папки темы.",
+        parameters: [
+          { name: "$path", type: "string", description: "Путь относительно папки темы", required: true }
+        ],
+        return_type: "string",
+        example: `<?= $this->linkCSS('css/main.css') ?>`
+      },
+      {
+        name: "linkJS",
+        signature: "linkJS(string $path): string",
+        description: "Возвращает <script> тег для JS файла из папки темы.",
+        parameters: [
+          { name: "$path", type: "string", description: "Путь относительно папки темы", required: true }
+        ],
+        return_type: "string",
+        example: `<?= $this->linkJS('js/main.js') ?>`
+      },
+      {
+        name: "renderLayoutChild",
+        signature: "renderLayoutChild(string $name, array $vars = []): void",
+        description: "Рендерит фрагмент из layout_childs/. Используется при is_dynamic_layout=true. Файл: layout_childs/{name}.tpl.php",
+        parameters: [
+          { name: "$name", type: "string", description: "Имя фрагмента (без .tpl.php): layout_childs/{name}.tpl.php", required: true },
+          { name: "$vars", type: "array", description: "Переменные для фрагмента", required: false }
+        ],
+        return_type: "void",
+        example: `// В main.tpl.php (is_dynamic_layout = true):
+<?php $this->renderLayoutChild('scheme', ['rows' => $rows]) ?>
+// Рендерит layout_childs/main_scheme.tpl.php`
+      },
+      {
+        name: "href_to",
+        signature: "href_to(string $action = '', array $params = []): string",
+        description: "Формирует URL к экшену текущего контроллера.",
+        parameters: [
+          { name: "$action", type: "string", description: "Имя экшена ('' = index)", required: false },
+          { name: "$params", type: "array", description: "GET-параметры", required: false }
+        ],
+        return_type: "string",
+        example: `<a href="<?= $this->href_to('view', ['id' => $item['id']]) ?>"><?= $item['title'] ?></a>
+<a href="<?= $this->href_to() ?>">← Назад</a>`
+      },
+      {
+        name: "addMainTplCSSName",
+        signature: "addMainTplCSSName(string $name): void",
+        description: "Добавляет CSS-класс к корневому элементу шаблона.",
+        parameters: [
+          { name: "$name", type: "string", description: "CSS-класс", required: true }
+        ],
+        return_type: "void",
+        example: `<?php $this->addMainTplCSSName('page-catalog') ?>`
+      },
+      {
+        name: "onDemandPrint",
+        signature: "onDemandPrint(): void",
+        description: "Выводит on-demand ресурсы (CSS/JS), добавленные контроллерами в процессе выполнения. Обычно вставляется перед </head>.",
+        parameters: [],
+        return_type: "void",
+        example: `<?= $this->onDemandPrint() ?>`
+      }
+    ]
   }
 ];
