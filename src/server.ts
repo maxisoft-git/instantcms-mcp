@@ -11,6 +11,7 @@ import {
   getCodeExample
 } from "./tools/addon-tool.js";
 import { scaffoldAddon, scaffoldTemplate } from "./tools/scaffold-tool.js";
+import { scaffoldLayoutScheme, listLayoutPresets, layoutPresets } from "./tools/layout-tool.js";
 
 import { hooks, hookCategories } from "./data/hooks.js";
 import { components } from "./data/components.js";
@@ -269,6 +270,114 @@ export function createServer(): McpServer {
               "date_format($date)": "Форматирование даты"
             }
           }, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 13. Генерация схемы виджетов (layout scheme) ─────────────────────────
+  server.tool(
+    "scaffold_layout_scheme",
+    `Генерирует YAML-схему расположения виджетов для импорта в шаблон modern InstantCMS.
+Схема описывает ряды (rows) и колонки (cols) Bootstrap 4 сетки с позициями для виджетов.
+Результат импортируется через: Панель управления → Оформление → Шаблоны → Modern → Схема → Импорт.
+Можно задать произвольную схему через параметр rows, или использовать готовый пресет через preset.`,
+    {
+      template: z.string().optional().default("modern")
+        .describe("Имя шаблона. По умолчанию: modern"),
+
+      preset: z.enum(["simple", "with_sidebar_left", "modern_full"]).optional()
+        .describe(`Готовый пресет схемы. Используйте вместо rows для быстрого старта:
+  simple          — шапка + контент/сайдбар + подвал
+  with_sidebar_left — три колонки: лево/контент/право + двухколоночный футер
+  modern_full     — полная схема modern (топ-бар, лого, навбар, баннер, три колонки, префутер, футер)`),
+
+      rows: z.array(z.object({
+        title: z.string().describe("Отображаемое название ряда в админке"),
+        tag: z.string().nullish().describe("HTML тег Bootstrap row-элемента. null = без тега. Примеры: div, main"),
+        parent_col: z.string().optional()
+          .describe("position_name колонки-родителя (для вложенных рядов). Ряд будет вложен внутрь этой позиции"),
+        nested_position: z.string().optional().default("after")
+          .describe("Позиция вложения: 'after' (после виджетов, по умолчанию)"),
+        class: z.string().nullish().describe("CSS классы на Bootstrap row-элементе. Bootstrap 4: py-3, mt-auto"),
+        outer_tag: z.string().optional()
+          .describe("Внешний HTML тег-обёртка вокруг ряда. Примеры: header, footer, section, div, nav"),
+        outer_class: z.string().optional().describe("CSS классы внешнего тега"),
+        container: z.string().optional()
+          .describe("Класс контейнера Bootstrap 4: 'container', 'container-fluid', '' (без контейнера). По умолчанию: 'container'"),
+        container_tag: z.string().optional().describe("HTML тег контейнера. По умолчанию: div"),
+        container_class: z.string().optional()
+          .describe("CSS классы контейнера. Примеры: 'd-flex justify-content-between align-items-center flex-nowrap'"),
+        no_gutters: z.boolean().optional().describe("Добавить Bootstrap no-gutters к ряду"),
+        cols: z.array(z.object({
+          title: z.string().describe("Отображаемое название колонки"),
+          position: z.string().optional()
+            .describe("Имя позиции для привязки виджетов. Авто-генерируется как pos_N если не задано. Используйте con_* для полноширинных позиций"),
+          tag: z.string().optional().describe("HTML тег колонки. По умолчанию: div. Примеры: article, aside, nav"),
+          class: z.string().nullish().describe("CSS классы на колонке. Bootstrap 4: mb-3 mb-md-4"),
+          type: z.enum(["typical", "custom"]).optional().default("typical")
+            .describe("Тип колонки: typical = обычная Bootstrap-колонка, custom = кастомный HTML с {position}"),
+          wrapper: z.string().optional()
+            .describe("Для type=custom: HTML-обёртка с плейсхолдером {position}. Примеры: '{position}' или '<div class=\"my-wrap\">{position}</div>'"),
+          col: z.string().optional()
+            .describe("Bootstrap 4 col-класс (xs/default). Примеры: col, col-sm-12, col-sm"),
+          col_md: z.string().optional()
+            .describe("Bootstrap 4 col-md класс. Примеры: col-md-6, col-md"),
+          col_lg: z.string().optional()
+            .describe("Bootstrap 4 col-lg класс. Примеры: col-lg-8, col-lg-4, col-lg-3, col-lg"),
+          col_xl: z.string().optional()
+            .describe("Bootstrap 4 col-xl класс. Примеры: col-xl-2"),
+          col_class: z.string().optional()
+            .describe("Переопределить все responsive классы одним значением"),
+          order: z.number().optional().describe("Bootstrap order (default). 0 = без order"),
+          cut_before: z.boolean().optional()
+            .describe("Вставить Bootstrap w-100 перед колонкой (принудительный перенос строки)")
+        })).describe("Колонки ряда")
+      })).optional()
+        .describe("Массив рядов схемы. Используйте вместо preset для кастомной схемы")
+    },
+    async ({ template, preset, rows }) => {
+      let input;
+
+      if (preset && !rows) {
+        // Use preset
+        const p = layoutPresets[preset];
+        input = { ...p.scheme, template: template || p.scheme.template };
+      } else if (rows) {
+        input = { template: template || 'modern', rows };
+      } else {
+        // Default: list presets
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              error: "Укажите preset или rows",
+              available_presets: listLayoutPresets()
+            }, null, 2)
+          }]
+        };
+      }
+
+      const result = scaffoldLayoutScheme(input as Parameters<typeof scaffoldLayoutScheme>[0]);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 14. Список пресетов схем виджетов ────────────────────────────────────
+  server.tool(
+    "list_layout_presets",
+    "Список готовых пресетов схем расположения виджетов для шаблона modern InstantCMS. Используйте preset в scaffold_layout_scheme для быстрой генерации.",
+    {},
+    async () => {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(listLayoutPresets(), null, 2)
         }]
       };
     }
