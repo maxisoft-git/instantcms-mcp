@@ -1,4 +1,4 @@
-import { addonStructures, fieldTypes } from "../data/schemas.js";
+import { addonStructures, fieldTypes, controllerDirectoryLayout, classNamingConventions } from "../data/schemas.js";
 import { components } from "../data/components.js";
 
 export function getAddonStructure(addonType: string = "basic"): object {
@@ -14,6 +14,7 @@ export function getAddonStructure(addonType: string = "basic"): object {
   return {
     type: structure.type,
     description: structure.description,
+    notes: structure.notes || [],
     available_types: Object.keys(addonStructures).map(t => ({
       key: t,
       description: addonStructures[t].description
@@ -24,32 +25,44 @@ export function getAddonStructure(addonType: string = "basic"): object {
       description: f.description,
       template: f.template
     })),
-    naming_conventions: {
-      controller_class: "Совпадает с именем дополнения. Пример: class myaddon extends cmsFrontend",
-      backend_class: "backend{Name}. Пример: class backendMyaddon extends cmsBackend",
-      model_class: "model{Name}. Пример: class modelMyaddon extends cmsModel",
-      hook_class: "on{AddonName}{HookNameCamelCase}. Пример: class onMyaddonContentAfterAddApprove",
-      form_class: "form{Name}{FormName}. Пример: class formMyaddonItem extends cmsForm",
-      grid_class: "grid{Name}{GridName}. Пример: class gridMyaddonItems extends cmsGrid",
-      widget_class: "widget{Name}{WidgetName}. Пример: class widgetMyaddonList extends cmsWidget",
-      install_class: "install{Name}. Пример: class installMyaddon extends cmsInstaller",
-      uninstall_class: "uninstall{Name}. Пример: class uninstallMyaddon extends cmsInstaller"
-    },
+    directory_layout: controllerDirectoryLayout,
+    naming_conventions: classNamingConventions,
     db_conventions: {
-      table_naming: "Используйте {addon_name}_{entity}. Пример: myaddon_items",
-      prefix: "Префикс БД берётся из конфига: {db_prefix}. В install.php используйте переменную $this->db->prefix",
+      table_naming: "Таблицы: {addon_name}_{entity}. Пример: catalog_items, catalog_categories",
+      prefix: "Префикс из конфига: в install.php используйте $this->db->prefix, в SQL-запросах — {prefix}",
       common_fields: {
         id: "INT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
         user_id: "INT UNSIGNED — ID автора",
         date_pub: "DATETIME — дата публикации",
-        is_pub: "TINYINT(1) — статус публикации (1=опубликован, 0=скрыт)",
-        title: "VARCHAR(255) — заголовок"
+        is_pub: "TINYINT(1) — статус (1=опубликован, 0=скрыт)",
+        title: "VARCHAR(255) — заголовок",
+        ordering: "INT UNSIGNED — порядок сортировки (для drag&drop в гридах)"
       }
     },
     url_structure: {
       frontend: "/{addon_name}/{action}/{param}",
       backend: "/admin/{addon_name}/{action}/{param}",
-      example: "/myaddon/view/123, /admin/myaddon/item_edit/123"
+      examples: [
+        "/{name}/ → action index (actions/index.php)",
+        "/{name}/view/123 → action view (actions/view.php), request->get('id')=123",
+        "/admin/{name}/ → backend action index (backend/actions/index.php)",
+        "/admin/{name}/items → backend action items (backend/actions/items.php)",
+        "/admin/{name}/items/add → external_action_prefix='items_' → backend/actions/items_add.php",
+        "/admin/{name}/items/edit/5 → backend/actions/items_add.php с params[0]=5"
+      ]
+    },
+    language_files: {
+      location: "/system/languages/{lang}/controllers/{name}/{name}.php",
+      note: "Языковые файлы расположены ВНЕ папки контроллера!",
+      examples: [
+        "/system/languages/ru/controllers/catalog/catalog.php",
+        "/system/languages/en/controllers/catalog/catalog.php"
+      ]
+    },
+    template_files: {
+      frontend: "/templates/{theme}/controllers/{name}/{action}.tpl.php",
+      backend: "/templates/admincoreui/controllers/{name}/{action}.tpl.php",
+      widgets: "/templates/{theme}/controllers/{name}/{widget_name}.tpl.php"
     }
   };
 }

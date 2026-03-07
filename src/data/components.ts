@@ -660,5 +660,624 @@ $template = cmsConfig::get('template', 'default');
 $db_prefix = cmsConfig::get('db_prefix', 'cms_');`
       }
     ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsWidget — базовый класс виджетов
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsWidget",
+    class: "cmsWidget",
+    description: "Базовый класс всех виджетов для публичных страниц. Виджеты размещаются в позициях шаблона через панель виджетов. Файл: widgets/{widget_name}/widget.php",
+    access: "Наследование: class widget{Name}{WidgetName} extends cmsWidget",
+    methods: [
+      {
+        name: "run",
+        signature: "run(): array|false",
+        description: "Основной метод виджета. Должен вернуть массив переменных для шаблона или false для пропуска рендеринга.",
+        parameters: [],
+        return_type: "array|false",
+        example: `class widgetCatalogList extends cmsWidget {
+
+    // Отключить кэш для динамического контента:
+    public $is_cacheable = false;
+
+    public function run() {
+
+        $limit = $this->getOption('limit', 5);
+
+        $controller = cmsCore::getController('catalog');
+        $items = $controller->model
+            ->filterEqual('is_pub', 1)
+            ->orderBy('date_pub', 'desc')
+            ->limit($limit)
+            ->get('catalog_items');
+
+        if (!$items) {
+            return false;  // Виджет не выводится
+        }
+
+        // Шаблон: /templates/{theme}/controllers/catalog/list.tpl.php
+        return [
+            'items' => $items,
+            'limit' => $limit
+        ];
+    }
+}`
+      },
+      {
+        name: "getOption",
+        signature: "getOption(string $key, mixed $default = false): mixed",
+        description: "Получить значение настройки виджета. Поддерживает вложенные ключи через ':' (например 'options:ctype_id').",
+        parameters: [
+          { name: "$key", type: "string", description: "Имя опции или вложенный путь через ':'", required: true },
+          { name: "$default", type: "mixed", description: "Значение по умолчанию", default: "false" }
+        ],
+        return_type: "mixed",
+        example: `$limit   = $this->getOption('limit', 10);
+$ctype   = $this->getOption('ctype_id', 0);
+$dataset = $this->getOption('options:dataset', 'all');  // вложенный ключ`
+      },
+      {
+        name: "getOptions",
+        signature: "getOptions(): array",
+        description: "Получить все настройки виджета в виде массива",
+        parameters: [],
+        return_type: "array",
+        example: `$all_options = $this->getOptions();
+// Передача всех опций в метод контроллера:
+return $this->controller_tags->getTagsWidgetParams($this->getOptions());`
+      },
+      {
+        name: "disableCache",
+        signature: "disableCache(): void",
+        description: "Отключить кэширование виджета в коде. Альтернатива: свойство public $is_cacheable = false.",
+        parameters: [],
+        return_type: "void",
+        example: `public function run() {
+    $this->disableCache(); // или: public $is_cacheable = false;
+    // ...
+}`
+      },
+      {
+        name: "setTemplate",
+        signature: "setTemplate(string $template): void",
+        description: "Изменить имя шаблона виджета (по умолчанию = имя виджета)",
+        parameters: [
+          { name: "$template", type: "string", description: "Имя шаблона без .tpl.php", required: true }
+        ],
+        return_type: "void",
+        example: `// По умолчанию шаблон = имя виджета ('list')
+// Чтобы использовать другой шаблон:
+$this->setTemplate('list_compact');
+// Ищет: /templates/{theme}/controllers/{name}/list_compact.tpl.php`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsBackend — базовый класс бэкенд-контроллеров
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsBackend",
+    class: "cmsBackend",
+    description: "Базовый класс всех бэкенд-контроллеров. Файл backend.php: class backend{Name} extends cmsBackend. Содержит getBackendMenu() и before(). Экшены — в отдельных файлах backend/actions/.",
+    access: "Наследование: class backend{Name} extends cmsBackend",
+    methods: [
+      {
+        name: "getBackendMenu",
+        signature: "getBackendMenu(): array",
+        description: "Возвращает пункты меню левой панели в бэкенде. Поддерживает иконки, счётчики, подменю.",
+        parameters: [],
+        return_type: "array",
+        example: `public function getBackendMenu() {
+    return [
+        // Простой пункт
+        [
+            'title'   => LANG_CATALOG_CP_ITEMS,
+            'url'     => href_to($this->root_url, 'items'),
+            'options' => ['icon' => 'list']
+        ],
+        // Пункт со счётчиком
+        [
+            'title'   => LANG_CATALOG_CP_PENDING,
+            'counter' => $this->model->getPendingCount(),
+            'url'     => href_to($this->root_url, 'pending'),
+            'options' => ['icon' => 'clock']
+        ],
+        // Родительский пункт с подменю
+        [
+            'title'        => LANG_CATALOG_CP_PRICES,
+            'url'          => href_to($this->root_url, 'prices'),
+            'childs_count' => 2,
+            'options'      => ['icon' => 'money-bill']
+        ],
+        // Дочерние пункты (level 2)
+        [
+            'title' => LANG_CATALOG_CP_PRICES_BASIC,
+            'level' => 2,
+            'url'   => href_to($this->root_url, 'prices', 'basic')
+        ],
+        [
+            'title' => LANG_CATALOG_CP_PRICES_VIP,
+            'level' => 2,
+            'url'   => href_to($this->root_url, 'prices', 'vip')
+        ],
+        // Настройки
+        [
+            'title'   => LANG_OPTIONS,
+            'url'     => href_to($this->root_url, 'options'),
+            'options' => ['icon' => 'cog']
+        ]
+    ];
+}`
+      },
+      {
+        name: "before",
+        signature: "before(string $action_name): bool",
+        description: "Вызывается перед каждым экшеном бэкенда. Для дополнительных проверок доступа. Обязательно вызывать parent::before().",
+        parameters: [
+          { name: "$action_name", type: "string", description: "Имя текущего экшена", required: true }
+        ],
+        return_type: "bool",
+        example: `public function before($action_name) {
+    if (!parent::before($action_name)) {
+        return false;
+    }
+    // Добавить заголовок безопасности
+    $this->cms_core->response->setHeader('X-Frame-Options', 'DENY');
+    return true;
+}`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // trait listgrid — для бэкенд экшенов-списков
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "trait listgrid",
+    class: "icms\\traits\\controllers\\actions\\listgrid",
+    description: "Трейт для бэкенд экшенов, отображающих список с гридом. Подключается в backend/actions/*.php. Логика настраивается через свойства в __construct().",
+    access: "use icms\\traits\\controllers\\actions\\listgrid; в классе action{Name}X extends cmsAction",
+    methods: [
+      {
+        name: "Свойства трейта listgrid",
+        signature: "Properties",
+        description: "Свойства для настройки трейта в __construct()",
+        parameters: [],
+        return_type: "void",
+        example: `class actionCatalogItems extends cmsAction {
+
+    use icms\\traits\\controllers\\actions\\listgrid;
+
+    public function __construct($controller, $params = []) {
+        parent::__construct($controller, $params);
+
+        // ОБЯЗАТЕЛЬНЫЕ:
+        $this->table_name = 'catalog_items';    // основная таблица
+        $this->grid_name  = 'items';            // имя грида (файл backend/grids/grid_items.php)
+        $this->title      = LANG_CATALOG_CP_ITEMS; // заголовок страницы
+
+        // ТУЛБАР — кнопки над списком:
+        $this->tool_buttons = [
+            [
+                'class' => 'add',                // CSS класс кнопки
+                'title' => LANG_CATALOG_CP_ADD,
+                'href'  => $this->cms_template->href_to('items', 'add')
+            ],
+            [
+                'class' => 'btn btn-secondary',
+                'title' => LANG_EXPORT,
+                'href'  => $this->cms_template->href_to('items', 'export'),
+                'icon'  => 'download'
+            ]
+        ];
+
+        // ОПЦИОНАЛЬНЫЕ:
+        // Хук для расширения тулбара другими дополнениями:
+        $this->toolbar_hook = 'catalog_items_toolbar';
+
+        // Коллбэк для дополнительных JOIN-ов / фильтров модели:
+        $this->list_callback = function (\\cmsModel $model) {
+            return $model->joinLeft('users u', 'u.id = t.user_id', ['u.nickname as user_nickname']);
+        };
+
+        // Коллбэк для постобработки записей:
+        $this->items_callback = function ($items) {
+            foreach ($items as &$item) {
+                $item['status_label'] = $item['is_pub'] ? 'Активен' : 'Скрыт';
+            }
+            return $items;
+        };
+
+        // Передача управления вложенным экшенам:
+        // URL /admin/catalog/items/add → запустит action items_add
+        $this->external_action_prefix = 'items_';
+
+        // Кол-во записей на страницу (по умолчанию 30):
+        $this->default_perpage = 20;
+    }
+}`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // trait formItem — для бэкенд экшенов-форм
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "trait formItem",
+    class: "icms\\traits\\controllers\\actions\\formItem",
+    description: "Трейт для бэкенд экшенов добавления/редактирования. Один экшен обрабатывает и add, и edit. Логика через свойства в __construct().",
+    access: "use icms\\traits\\controllers\\actions\\formItem; в классе action{Name}X extends cmsAction",
+    methods: [
+      {
+        name: "Свойства трейта formItem",
+        signature: "Properties",
+        description: "Свойства для настройки трейта в __construct()",
+        parameters: [],
+        return_type: "void",
+        example: `class actionCatalogItemsAdd extends cmsAction {
+
+    use icms\\traits\\controllers\\actions\\formItem;
+
+    public function __construct($controller, $params = []) {
+        parent::__construct($controller, $params);
+
+        $list_url = $this->cms_template->href_to('items');
+
+        // ОБЯЗАТЕЛЬНЫЕ:
+        $this->table_name  = 'catalog_items';  // таблица БД
+        $this->form_name   = 'item';           // форма (файл backend/forms/form_item.php)
+        $this->success_url = $list_url;        // редирект после сохранения
+
+        // ЗАГОЛОВОК — строка или массив:
+        $this->title = [
+            'add'  => LANG_CATALOG_CP_ADD,
+            'edit' => '{title}'   // {title} заменяется значением поля title записи
+        ];
+
+        // ХЛЕБНЫЕ КРОШКИ:
+        $this->breadcrumbs = [
+            [LANG_CATALOG_CP_ITEMS, $list_url],
+            isset($params[0]) ? '{title}' : LANG_CATALOG_CP_ADD
+        ];
+
+        // ТУЛБАР — кнопки Сохранить/Отменить:
+        $this->use_default_tool_buttons = true;
+        // Или кастомные кнопки:
+        // $this->tool_buttons = [...];
+
+        // ДЕФОЛТНЫЕ ЗНАЧЕНИЯ для новой записи:
+        $this->default_item = [
+            'is_pub'     => 1,
+            'date_pub'   => date('Y-m-d H:i:s'),
+            'sort_order' => 0
+        ];
+
+        // ПАРАМЕТРЫ ФОРМЫ (передаются в form->init()):
+        // $this->form_opts = [$this->controller->getOptions()];
+
+        // КОЛЛБЭКИ:
+        $this->add_callback = function($id, $data) {
+            // После добавления записи
+            cmsCache::getInstance()->clean('catalog');
+        };
+
+        $this->update_callback = function($data) {
+            // После обновления записи
+            cmsCache::getInstance()->clean('catalog');
+        };
+
+        // ПОЛЕ ЗАГОЛОВКА для копирования (добавляет " (1)"):
+        $this->title_field = 'title';
+
+        // КЛЮЧ КЭША для сброса после сохранения:
+        $this->cache_key = 'catalog';
+
+        // МЕТОДЫ МОДЕЛИ (по умолчанию insert/update):
+        // $this->form_add_method  = 'insert';
+        // $this->form_edit_method = 'update';
+    }
+}`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Grid Definition — структура файла грида
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "Grid Definition (backend/grids/)",
+    class: "function grid_{name}",
+    description: "Определение грида в файле backend/grids/grid_{name}.php. ФУНКЦИЯ, не класс! Возвращает массив options/columns/actions.",
+    access: "Файл: backend/grids/grid_{name}.php. Функция: grid_{name}($controller, $model=null)",
+    methods: [
+      {
+        name: "options",
+        signature: "options: array",
+        description: "Настройки отображения и поведения грида",
+        parameters: [],
+        return_type: "array",
+        example: `$options = [
+    'is_sortable'   => true,   // Сортировка по клику на заголовок столбца
+    'is_filter'     => true,   // Показать панель фильтрации
+    'is_pagination' => true,   // Пагинация (кол-во задаётся в экшене)
+    'is_draggable'  => false,  // Drag&drop строк для изменения порядка
+    'is_selectable' => false,  // Чекбоксы для массовых операций
+    'order_by'      => 'id',   // Поле сортировки по умолчанию
+    'order_to'      => 'desc', // Направление: 'asc' или 'desc'
+    'show_id'       => true    // Показать колонку ID
+
+    // Для drag&drop с сохранением порядка:
+    // 'is_draggable'  => true,
+    // 'drag_save_url' => href_to('admin', 'reorder', 'catalog_items'),
+];`
+      },
+      {
+        name: "columns",
+        signature: "columns: array",
+        description: "Определение столбцов грида. Ключ = имя поля в БД.",
+        parameters: [],
+        return_type: "array",
+        example: `$columns = [
+    // Простой столбец
+    'id' => ['title' => 'ID', 'width' => 60],
+
+    // Со ссылкой на редактирование
+    'title' => [
+        'title'   => LANG_TITLE,
+        'href'    => href_to($controller->root_url, 'items', ['edit', '{id}'])
+    ],
+
+    // С JOIN-ом: указать order_by с алиасом таблицы
+    'user_nickname' => [
+        'title'     => LANG_USER,
+        'width'     => 150,
+        'href'      => href_to('users', '{user_id}'),
+        'order_by'  => 'u.nickname',   // алиас из JOIN
+        'filter'    => 'like',
+        'filter_by' => 'u.nickname'    // поле для фильтрации
+    ],
+
+    // Дата с форматированием
+    'date_pub' => [
+        'title'   => LANG_DATE_PUB,
+        'width'   => 150,
+        'filter'  => 'date',           // фильтр по диапазону дат
+        'handler' => function ($value) {
+            return html_date_time($value);
+        }
+    ],
+
+    // Флаг с inline-переключателем
+    'is_pub' => [
+        'title'       => LANG_IS_PUB,
+        'width'       => 60,
+        'flag'        => true,
+        'flag_toggle' => href_to($controller->root_url, 'toggle_item', ['{id}', 'catalog_items', 'is_pub'])
+    ],
+
+    // Фильтр по выпадающему списку
+    'status' => [
+        'title'  => LANG_STATUS,
+        'filter' => 'exact',
+        'filter_select' => [
+            'items' => function($name) {
+                return ['' => LANG_ALL, 0 => LANG_INACTIVE, 1 => LANG_ACTIVE];
+            }
+        ],
+        'handler' => function ($value, $row) {
+            return $value ? '<span class="text-success">'.LANG_ACTIVE.'</span>'
+                          : '<span class="text-muted">'.LANG_INACTIVE.'</span>';
+        }
+    ],
+
+    // Числовой диапазон
+    'price' => ['title' => LANG_PRICE, 'filter' => 'range'],
+
+    // Подсветка строки
+    'priority' => [
+        'title'         => LANG_PRIORITY,
+        'class_handler' => function($row) {
+            if ($row['priority'] > 5) return 'bg-warning';
+            if ($row['priority'] < 0) return 'bg-danger';
+        }
+    ],
+
+    // Редактируемое поле inline (inline editing)
+    'sort_order' => [
+        'title'    => LANG_ORDER,
+        'width'    => 80,
+        'editable' => true   // позволяет редактировать прямо в гриде
+    ]
+];
+
+// Типы фильтров: 'like', 'exact', 'date', 'range'`
+      },
+      {
+        name: "actions",
+        signature: "actions: array",
+        description: "Кнопки действий для каждой строки грида (правая колонка)",
+        parameters: [],
+        return_type: "array",
+        example: `$actions = [
+    // Кнопка редактирования
+    [
+        'title' => LANG_EDIT,
+        'icon'  => 'pen',
+        'href'  => href_to($controller->root_url, 'items', ['edit', '{id}'])
+    ],
+
+    // Кнопка копирования записи
+    [
+        'title' => LANG_COPY,
+        'icon'  => 'copy',
+        'href'  => href_to($controller->root_url, 'items_add', ['{id}', 1])
+    ],
+
+    // Условная кнопка (показывается только при условии)
+    [
+        'title'   => LANG_APPROVE,
+        'icon'    => 'check',
+        'href'    => href_to($controller->root_url, 'items', ['approve', '{id}']),
+        'handler' => function ($item) {
+            return $item['is_pub'] == 0; // показать только если не опубликован
+        }
+    ],
+
+    // Кнопка с подтверждением и кастомным стилем
+    [
+        'title'   => LANG_DELETE,
+        'class'   => 'text-danger',       // CSS класс кнопки
+        'icon'    => 'times-circle',      // FontAwesome иконка (без fa-)
+        'confirm' => LANG_DELETE_CONFIRM, // текст подтверждения
+        'href'    => href_to($controller->root_url, 'items', ['delete', '{id}'])
+    ]
+];
+
+// Плейсхолдеры в href: {id}, {title}, {user_id} и любое другое поле строки`
+      },
+      {
+        name: "Пример полного грида",
+        signature: "function grid_items($controller, $model = null): array",
+        description: "Полный пример файла backend/grids/grid_items.php",
+        parameters: [],
+        return_type: "array",
+        example: `<?php
+// Файл: backend/grids/grid_items.php
+// ВАЖНО: функция, не класс!
+
+function grid_items($controller) {
+
+    $options = [
+        'is_sortable'   => true,
+        'is_filter'     => true,
+        'is_pagination' => true,
+        'is_draggable'  => false,
+        'is_selectable' => false,
+        'order_by'      => 'id',
+        'order_to'      => 'desc',
+        'show_id'       => true
+    ];
+
+    $columns = [
+        'title' => [
+            'title'   => LANG_TITLE,
+            'filter'  => 'like',
+            'href'    => href_to($controller->root_url, 'items', ['edit', '{id}'])
+        ],
+        'date_pub' => [
+            'title'   => LANG_DATE_PUB,
+            'width'   => 150,
+            'filter'  => 'date',
+            'handler' => function ($value) { return html_date_time($value); }
+        ],
+        'is_pub' => [
+            'title'       => LANG_IS_PUB,
+            'width'       => 60,
+            'flag'        => true,
+            'flag_toggle' => href_to($controller->root_url, 'toggle_item', ['{id}', 'catalog_items', 'is_pub'])
+        ]
+    ];
+
+    $actions = [
+        [
+            'title' => LANG_EDIT,
+            'icon'  => 'pen',
+            'href'  => href_to($controller->root_url, 'items', ['edit', '{id}'])
+        ],
+        [
+            'title'   => LANG_DELETE,
+            'class'   => 'text-danger',
+            'icon'    => 'times-circle',
+            'confirm' => LANG_DELETE_CONFIRM,
+            'href'    => href_to($controller->root_url, 'items', ['delete', '{id}'])
+        ]
+    ];
+
+    return ['options' => $options, 'columns' => $columns, 'actions' => $actions];
+}`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsForm — базовый класс форм
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsForm",
+    class: "cmsForm",
+    description: "Базовый класс форм. Используется для бэкенд форм (backend/forms/) и опций виджетов. Метод init() возвращает массив fieldset → childs → поля.",
+    access: "Наследование: class form{Name}Item extends cmsForm",
+    methods: [
+      {
+        name: "init",
+        signature: "init($do = null, ...$params): array",
+        description: "Определяет структуру формы. Принимает $do ('add'/'edit') и дополнительные параметры из form_opts. Возвращает массив fieldset-ов с полями.",
+        parameters: [
+          { name: "$do", type: "string", description: "'add' или 'edit' — тип операции", default: "null" }
+        ],
+        return_type: "array",
+        example: `class formCatalogItem extends cmsForm {
+
+    // $do = 'add' или 'edit' (передаётся из трейта formItem)
+    // $options = доп. параметры из $this->form_opts в экшене
+    public function init($do, $options = []) {
+
+        return [
+            // Секция (fieldset)
+            'basic' => [
+                'title'  => LANG_CP_BASIC,
+                'type'   => 'fieldset',
+                'childs' => [
+                    new fieldString('title', [
+                        'title' => LANG_TITLE,
+                        'rules' => [['required'], ['max_length', 255]]
+                    ]),
+                    new fieldHtml('content', [
+                        'title' => LANG_CONTENT
+                    ]),
+                    // Поле со встроенной валидацией через замыкание:
+                    new fieldString('slug', [
+                        'title' => LANG_SLUG,
+                        'rules' => [
+                            [function ($controller, $data, $value) {
+                                if (empty($value)) return true;
+                                // Уникальность слага:
+                                if (!empty($data['id'])) {
+                                    $controller->model->filterNotEqual('id', $data['id']);
+                                }
+                                $exists = $controller->model
+                                    ->filterEqual('slug', $value)
+                                    ->getCount('catalog_items');
+                                return $exists ? ERR_VALIDATE_UNIQUE : true;
+                            }]
+                        ]
+                    ]),
+                    new fieldCheckbox('is_pub', ['title' => LANG_IS_PUB, 'default' => 1]),
+                    new fieldDate('date_pub', [
+                        'title'   => LANG_DATE_PUB,
+                        'default' => date('Y-m-d H:i:s')
+                    ])
+                ]
+            ],
+            'media' => [
+                'title'  => LANG_MEDIA,
+                'type'   => 'fieldset',
+                'childs' => [
+                    new fieldImage('image', [
+                        'title'     => LANG_IMAGE,
+                        'max_width' => 1200,
+                        'max_size'  => 5120
+                    ])
+                ]
+            ]
+        ];
+    }
+}`
+      }
+    ]
   }
 ];
