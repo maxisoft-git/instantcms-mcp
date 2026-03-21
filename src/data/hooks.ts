@@ -28,7 +28,10 @@ export const hooks: Hook[] = [
     return_type: "void",
     example: `class onMyaddonEngineStart extends cmsAction {
     public function run($data) {
-        // Регистрация ресурсов при старте
+        // Подключение к базе данных, инициализация компонентов
+        $this->model->initMyAddon();
+        // Регистрация обработчиков событий
+        cmsEventsManager::hook('my_custom_event', [$this, 'handleCustomEvent']);
         return $data;
     }
 }`
@@ -42,6 +45,9 @@ export const hooks: Hook[] = [
     return_type: "void",
     example: `class onMyaddonEngineStop extends cmsAction {
     public function run($data) {
+        // Сохранение сессии, закрытие соединений, запись логов
+        $this->model->saveSessionData();
+        cmsCache::getInstance()->shutdown();
         return $data;
     }
 }`
@@ -69,6 +75,18 @@ export const hooks: Hook[] = [
     return_type: "void",
     example: `class onMyaddonError404 extends cmsAction {
     public function run($data) {
+        // Логирование 404 для аналитики
+        $this->model->log404([
+            'url'       => $_SERVER['REQUEST_URI'] ?? '',
+            'referer'   => $_SERVER['HTTP_REFERER'] ?? '',
+            'user_id'   => $this->cms_user->id,
+            'ip'        => $_SERVER['REMOTE_ADDR'] ?? '',
+            'created_at' => date('Y-m-d H:i:s')
+        ]);
+        // Перенаправление на страницу поиска или главную
+        if (strpos($_SERVER['REQUEST_URI'], '/products/') === 0) {
+            cmsCore::redirect(href_to('search') . '?q=' . urlencode(basename($_SERVER['REQUEST_URI'])));
+        }
         return $data;
     }
 }`
@@ -201,6 +219,21 @@ export const hooks: Hook[] = [
     return_type: "array|false",
     example: `class onMyaddonContentBeforeDelete extends cmsAction {
     public function run($data) {
+        $ctype_name = $data['ctype_name'];
+        $item = $data['item'];
+        
+        // Проверка, можно ли удалять материал
+        if ($item['is_system']) {
+            cmsCore::addSessionMessage('Системные материалы удалять нельзя', 'error');
+            return false;
+        }
+        
+        // Удаление связанных файлов
+        $this->model->deleteRelatedFiles($item['id']);
+        
+        // Удаление из поискового индекса
+        cmsCore::getModel('search')->removeItem($ctype_name, $item['id']);
+        
         return $data;
     }
 }`
@@ -235,6 +268,23 @@ export const hooks: Hook[] = [
     return_type: "array",
     example: `class onMyaddonContentAfterUpdateApprove extends cmsAction {
     public function run($data) {
+        $ctype_name = $data['ctype_name'];
+        $item = $data['item'];
+        
+        // Отправка уведомления подписчикам об изменении
+        $this->model->notifySubscribers($ctype_name, $item['id'], 'update');
+        
+        // Добавление в ленту активности
+        $activity = cmsCore::getController('activity');
+        $activity->addEntry('myaddon_item_updated', [
+            'ctype_name' => $ctype_name,
+            'item_id'   => $item['id'],
+            'title'     => $item['title']
+        ]);
+        
+        // Обновление sitemap
+        cmsCore::getController('sitemap')->recacheUrl($ctype_name, $item['id']);
+        
         return $data;
     }
 }`
@@ -251,6 +301,23 @@ export const hooks: Hook[] = [
     return_type: "array",
     example: `class onMyaddonContentAfterRestore extends cmsAction {
     public function run($data) {
+        $ctype_name = $data['ctype_name'];
+        $item = $data['item'];
+        
+        // Восстановление связей
+        $this->model->restoreRelations($ctype_name, $item['id']);
+        
+        // Возврат в поисковый индекс
+        cmsCore::getModel('search')->indexItem($ctype_name, $item['id']);
+        
+        // Отправка уведомления автору
+        $notice = cmsCore::getController('messages');
+        $notice->addNotice($item['user_id'], 'content_restored', [
+            'ctype_name' => $ctype_name,
+            'item_id'   => $item['id'],
+            'title'     => $item['title']
+        ]);
+        
         return $data;
     }
 }`
@@ -267,6 +334,23 @@ export const hooks: Hook[] = [
     return_type: "array",
     example: `class onMyaddonContentAfterTrashPut extends cmsAction {
     public function run($data) {
+        $ctype_name = $data['ctype_name'];
+        $item = $data['item'];
+        
+        // Удаление из поискового индекса
+        cmsCore::getModel('search')->removeItem($ctype_name, $item['id']);
+        
+        // Отправка уведомления автору
+        $notice = cmsCore::getController('messages');
+        $notice->addNotice($item['user_id'], 'content_trashed', [
+            'ctype_name' => $ctype_name,
+            'item_id'   => $item['id'],
+            'title'     => $item['title']
+        ]);
+        
+        // Логирование действия
+        $this->model->logAction('trash', $ctype_name, $item['id'], $item['user_id']);
+        
         return $data;
     }
 }`
@@ -689,6 +773,24 @@ export const hooks: Hook[] = [
     return_type: "array",
     example: `class onMyaddonUsersAddFriendship extends cmsAction {
     public function run($data) {
+        $user_id = $data['user_id'];
+        $friend_id = $data['friend_id'];
+        
+        // Запись в историю дружбы
+        $this->model->insert('myaddon_friends_history', [
+            'user_id'    => $user_id,
+            'friend_id'  => $friend_id,
+            'action'     => 'request',
+            'created_at' => date('Y-m-d H:i:s')
+        ]);
+        
+        // Отправка уведомления получателю
+        $notice = cmsCore::getController('messages');
+        $notice->addNotice($friend_id, 'friend_request', [
+            'from_user_id' => $user_id,
+            'message'     => 'Хочет добавить вас в друзья'
+        ]);
+        
         return $data;
     }
 }`
@@ -705,6 +807,22 @@ export const hooks: Hook[] = [
     return_type: "array",
     example: `class onMyaddonUsersAfterDeleteFriendship extends cmsAction {
     public function run($data) {
+        $user_id = $data['user_id'];
+        $friend_id = $data['friend_id'];
+        
+        // Удаление общих данных
+        $this->model->filterEqual('user_id', $user_id)
+                    ->filterEqual('friend_id', $friend_id)
+                    ->deleteFiltered('myaddon_friends_data');
+        
+        // Удаление из списка онлайн-друзей
+        cmsCache::getInstance()->delete("user_{$user_id}_friends");
+        cmsCache::getInstance()->delete("user_{$friend_id}_friends");
+        
+        // Обновление счётчика друзей
+        $this->model->updateFriendsCount($user_id);
+        $this->model->updateFriendsCount($friend_id);
+        
         return $data;
     }
 }`
@@ -722,6 +840,30 @@ export const hooks: Hook[] = [
     return_type: "array",
     example: `class onMyaddonUsersKarmaVote extends cmsAction {
     public function run($data) {
+        $target_id = $data['target_id'];
+        $vote = $data['vote'];
+        $user_id = $data['user_id'];
+        
+        // Запись в историю голосований за карму
+        $this->model->insert('myaddon_karma_history', [
+            'user_id'    => $user_id,
+            'target_id'  => $target_id,
+            'vote'       => $vote,
+            'created_at' => date('Y-m-d H:i:s')
+        ]);
+        
+        // Начисление бонусов за положительную карму
+        if ($vote > 0) {
+            $this->model->addBonus($target_id, 'positive_karma', $vote);
+        }
+        
+        // Отправка уведомления
+        $notice = cmsCore::getController('messages');
+        $notice->addNotice($target_id, 'karma_vote', [
+            'from_user_id' => $user_id,
+            'vote'        => $vote
+        ]);
+        
         return $data;
     }
 }`
@@ -839,6 +981,30 @@ export const hooks: Hook[] = [
     return_type: "array",
     example: `class onMyaddonCommentsRateAfter extends cmsAction {
     public function run($data) {
+        $comment = $data['comment'];
+        $vote = $data['vote'];
+        
+        // Начисление рейтинга автору комментария
+        $this->model->updateUserRating($comment['user_id'], $vote);
+        
+        // Запись в историю оценок
+        $this->model->insert('myaddon_comment_votes', [
+            'comment_id'  => $comment['id'],
+            'user_id'     => $comment['user_id'],
+            'vote'        => $vote,
+            'voter_id'    => $this->cms_user->id,
+            'created_at'  => date('Y-m-d H:i:s')
+        ]);
+        
+        // Уведомление автора комментария
+        if ($comment['user_id'] != $this->cms_user->id) {
+            $notice = cmsCore::getController('messages');
+            $notice->addNotice($comment['user_id'], 'comment_rated', [
+                'comment_id' => $comment['id'],
+                'vote'      => $vote
+            ]);
+        }
+        
         return $data;
     }
 }`
@@ -1233,6 +1399,23 @@ export const hooks: Hook[] = [
     return_type: "array",
     example: `class onMyaddonFormsBeforeValidate extends cmsAction {
     public function run($data) {
+        [$form_data, $form_config] = $data;
+        
+        // Кастомная валидация телефона
+        if (!empty($form_data['phone'])) {
+            $phone = preg_replace('/[^0-9+]/', '', $form_data['phone']);
+            if (strlen($phone) < 11) {
+                $errors[] = 'Некорректный номер телефона';
+            }
+        }
+        
+        // Проверка уникальности поля slug
+        if (!empty($form_data['slug'])) {
+            if ($this->model->slugExists($form_data['slug'])) {
+                $errors[] = 'URL-псевдоним уже существует';
+            }
+        }
+        
         return $data;
     }
 }`
@@ -1249,6 +1432,22 @@ export const hooks: Hook[] = [
     return_type: "array",
     example: `class onMyaddonFormsAfterValidate extends cmsAction {
     public function run($data) {
+        $form_data = $data['form_data'];
+        $form_config = $data['form_config'];
+        
+        // Обработка данных после успешной валидации
+        if ($form_config['name'] === 'contact_form') {
+            // Отправка email администратору
+            cmsCore::sendEmail([
+                'to'      => cmsConfig::get('admin_email'),
+                'subject' => 'Новая заявка с сайта',
+                'body'    => "Имя: {$form_data['name']}\nEmail: {$form_data['email']}\n{$form_data['message']}"
+            ]);
+            
+            // Сохранение в базу
+            $this->model->insert('myaddon_contacts', $form_data);
+        }
+        
         return $data;
     }
 }`
@@ -1307,6 +1506,23 @@ export const hooks: Hook[] = [
     return_type: "array",
     example: `class onMyaddonAdminInlineSave extends cmsAction {
     public function run($data) {
+        [$changed, $original, $row_index] = $data;
+        
+        // Логирование изменений
+        $this->model->logAdminEdit([
+            'table'      => $original['table_name'] ?? 'unknown',
+            'row_id'     => $original['id'],
+            'changed'    => $changed,
+            'admin_id'   => $this->cms_user->id,
+            'row_index'  => $row_index,
+            'created_at' => date('Y-m-d H:i:s')
+        ]);
+        
+        // Специальная обработка для поля ordering
+        if (isset($changed['ordering'])) {
+            $this->model->reorderItems($original['id'], $changed['ordering']);
+        }
+        
         return $data;
     }
 }`
@@ -1394,7 +1610,17 @@ export const hooks: Hook[] = [
     return_type: "void",
     example: `class onMyaddonFrontpageActionIndex extends cmsAction {
     public function run($data) {
-        // Добавить виджеты или данные на главную
+        // Добавление CSS/JS для главной страницы
+        $this->cms_template->addHeadCSS('/static/myaddon/frontpage.css');
+        $this->cms_template->addBottomJS('/static/myaddon/frontpage.js');
+        
+        // Регистрация виджетов
+        cmsCore::getController('widget')->registerPosition('frontpage_banner');
+        
+        // Получение данных для баннера
+        $banners = $this->model->getActiveBanners();
+        $this->cms_template->setContext('banners', $banners);
+        
         return $data;
     }
 }`
@@ -1560,6 +1786,26 @@ class onMyaddonSitemapUrlsListMyaddon extends cmsAction {
     return_type: "void",
     example: `class onMyaddonPublishDelayedContent extends cmsAction {
     public function run($data) {
+        // Обработка отложенного контента
+        $items = $this->model
+            ->filterEqual('is_pub', 0)
+            ->filterNotNull('date_pub')
+            ->filterLtEqual('date_pub', date('Y-m-d H:i:s'))
+            ->get('myaddon_items');
+        
+        foreach ($items as $item) {
+            $this->model->update('myaddon_items', $item['id'], [
+                'is_pub' => 1,
+                'published_at' => date('Y-m-d H:i:s')
+            ]);
+            
+            // Добавление в поисковый индекс
+            cmsCore::getModel('search')->indexItem('myaddon', $item['id']);
+            
+            // Отправка уведомлений подписчикам
+            $this->model->notifySubscribers($item['id']);
+        }
+        
         return $data;
     }
 }`
@@ -1579,6 +1825,28 @@ class onMyaddonSitemapUrlsListMyaddon extends cmsAction {
     return_type: "array",
     example: `class onMyaddonSubscribe extends cmsAction {
     public function run($data) {
+        $user_id = $data['user_id'];
+        $target_id = $data['target_id'];
+        $target_type = $data['target_type'];
+        
+        // Сохранение подписки в своей таблице
+        $this->model->insert('myaddon_subscriptions', [
+            'user_id'     => $user_id,
+            'target_id'   => $target_id,
+            'target_type' => $target_type,
+            'created_at'  => date('Y-m-d H:i:s')
+        ]);
+        
+        // Обновление счётчика подписчиков
+        $this->model->incrementSubscribersCount($target_type, $target_id);
+        
+        // Отправка подтверждения
+        $notice = cmsCore::getController('messages');
+        $notice->addNotice($user_id, 'subscription_confirmed', [
+            'target_type' => $target_type,
+            'target_id'  => $target_id
+        ]);
+        
         return $data;
     }
 }`
@@ -1596,6 +1864,22 @@ class onMyaddonSitemapUrlsListMyaddon extends cmsAction {
     return_type: "array",
     example: `class onMyaddonUnsubscribe extends cmsAction {
     public function run($data) {
+        $user_id = $data['user_id'];
+        $target_id = $data['target_id'];
+        $target_type = $data['target_type'];
+        
+        // Удаление подписки
+        $this->model->filterEqual('user_id', $user_id)
+                    ->filterEqual('target_id', $target_id)
+                    ->filterEqual('target_type', $target_type)
+                    ->deleteFiltered('myaddon_subscriptions');
+        
+        // Обновление счётчика подписчиков
+        $this->model->decrementSubscribersCount($target_type, $target_id);
+        
+        // Удаление из кэша
+        cmsCache::getInstance()->delete("subscribers_{$target_type}_{$target_id}");
+        
         return $data;
     }
 }`
@@ -1634,6 +1918,31 @@ class onMyaddonSitemapUrlsListMyaddon extends cmsAction {
     return_type: "array",
     example: `class onMyaddonRatingVote extends cmsAction {
     public function run($data) {
+        $target = $data['target'];
+        $target_id = $data['target_id'];
+        $vote = $data['vote'];
+        $user_id = $data['user_id'];
+        
+        // Проверка, не голосовал ли уже пользователь
+        if ($this->model->hasVoted($target, $target_id, $user_id)) {
+            return $data; // Игнорируем повторный голос
+        }
+        
+        // Сохранение голоса
+        $this->model->insert('myaddon_ratings', [
+            'target'     => $target,
+            'target_id'  => $target_id,
+            'user_id'    => $user_id,
+            'vote'       => $vote,
+            'created_at' => date('Y-m-d H:i:s')
+        ]);
+        
+        // Начисление баллов автору контента
+        $content = $this->model->getItem($target, $target_id);
+        if ($content && $content['user_id']) {
+            $this->model->addRatingPoints($content['user_id'], $vote);
+        }
+        
         return $data;
     }
 }`

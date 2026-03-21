@@ -234,10 +234,12 @@ export function getFieldTypes(fieldType?: string): object {
 export function getCodeExample(task: string): object {
   const lower = task.toLowerCase();
 
-  const examples: Array<{ keywords: string[]; title: string; code: string; explanation: string }> = [
+  const examples: Array<{ keywords: string[]; title: string; code: string; explanation: string; category: string }> = [
+    // СПИСКИ И ПАГИНАЦИЯ
     {
-      keywords: ['список', 'items', 'list', 'страниц', 'paginat'],
+      keywords: ['список', 'items', 'list', 'страниц', 'paginat', 'index'],
       title: "Список элементов с пагинацией",
+      category: "pagination",
       explanation: "Паттерн получения постраничного списка из БД",
       code: `public function actionIndex() {
     $page    = $this->request->get('page', 1);
@@ -259,8 +261,62 @@ export function getCodeExample(task: string): object {
 }`
     },
     {
-      keywords: ['ajax', 'json', 'fetch', 'запрос'],
+      keywords: ['один', 'item', 'detail', 'просмотр', 'view'],
+      title: "Просмотр одного элемента",
+      category: "item",
+      explanation: "Паттерн для страницы просмотра элемента",
+      code: `public function actionView($id) {
+
+    $item = $this->model
+        ->filterEqual('id', $id)
+        ->filterEqual('is_pub', 1)
+        ->getItem('myaddon_items');
+
+    if (!$item) { return cmsCore::error404(); }
+
+    // Инкримент просмотров
+    $this->model->increment('myaddon_items', $id, 'views');
+
+    return $this->cms_template->render('view', [
+        'item' => $item
+    ]);
+}`
+    },
+    {
+      keywords: ['join', 'связь', 'related', 'users', 'user_id'],
+      title: "Получение элементов с данными пользователя",
+      category: "joins",
+      explanation: "JOIN с таблицей пользователей для получения nickname",
+      code: `$items = $this->model
+    ->select('i.*')
+    ->select('u.nickname as user_nickname', 'u.avatar as user_avatar')
+    ->join('users u', 'u.id = i.user_id')
+    ->filterEqual('i.is_pub', 1)
+    ->orderBy('i.date_pub', 'desc')
+    ->limit(20)
+    ->get('myaddon_items i');
+
+// В шаблоне: $item['user_nickname'], $item['user_avatar']`
+    },
+    {
+      keywords: ['группировка', 'group', 'count', 'groupBy', 'статистика'],
+      title: "Группировка и подсчёт",
+      category: "aggregation",
+      explanation: "GROUP BY для статистики",
+      code: `$stats = $this->model
+    ->select('category_id')
+    ->select('COUNT(*) as cnt')
+    ->groupBy('category_id')
+    ->orderBy('cnt', 'desc')
+    ->get('myaddon_items');
+
+// Результат: [['category_id' => 1, 'cnt' => 15], ...]`
+    },
+    // AJAX И JSON
+    {
+      keywords: ['ajax', 'json', 'fetch', 'запрос', 'api'],
       title: "Обработка AJAX запроса",
+      category: "ajax",
       explanation: "Паттерн для AJAX action, возвращающего JSON",
       code: `public function actionSave() {
 
@@ -288,8 +344,38 @@ export function getCodeExample(task: string): object {
 }`
     },
     {
-      keywords: ['форм', 'form', 'валидац'],
-      title: "Обработка формы",
+      keywords: ['удалить', 'delete', 'del'],
+      title: "AJAX удаление элемента",
+      category: "ajax",
+      explanation: "Удаление с проверкой прав и AJAX ответом",
+      code: `public function actionDelete() {
+
+    if (!$this->request->isAjax()) {
+        return $this->renderJSON(['error' => 'Bad request']);
+    }
+
+    $id = $this->request->get('id', 0);
+
+    $item = $this->model->getItemByField('myaddon_items', 'id', $id);
+    if (!$item) {
+        return $this->renderJSON(['error' => 'Элемент не найден']);
+    }
+
+    // Проверка прав
+    if ($item['user_id'] !== $this->cms_user->id && !$this->cms_user->is_admin) {
+        return $this->renderJSON(['error' => 'Нет прав']);
+    }
+
+    $this->model->delete('myaddon_items', $id);
+
+    return $this->renderJSON(['success' => true]);
+}`
+    },
+    // ФОРМЫ
+    {
+      keywords: ['форм', 'form', 'валидац', 'add', 'create'],
+      title: "Обработка формы добавления",
+      category: "forms",
       explanation: "Паттерн для страницы с формой добавления",
       code: `public function actionAdd() {
 
@@ -318,8 +404,43 @@ export function getCodeExample(task: string): object {
 }`
     },
     {
+      keywords: ['edit', 'редактир', 'update', 'изменить'],
+      title: "Форма редактирования",
+      category: "forms",
+      explanation: "Паттерн для редактирования существующего элемента",
+      code: `public function actionEdit($id) {
+
+    $item = $this->model->getItemByField('myaddon_items', 'id', $id);
+    if (!$item) { return cmsCore::error404(); }
+
+    // Проверка прав
+    if ($item['user_id'] !== $this->cms_user->id && !$this->cms_user->is_admin) {
+        return cmsCore::error403();
+    }
+
+    $form = $this->makeForm('form_item');
+
+    if ($this->request->isPost()) {
+
+        $item_data = $form->parse($this->request->data('post'));
+
+        if ($form->validate($item_data)) {
+            $this->model->update('myaddon_items', $id, $item_data);
+            return $this->redirect($this->href_to('view', $id));
+        }
+    }
+
+    return $this->cms_template->render('edit', [
+        'form' => $form->render($item),
+        'item'  => $item
+    ]);
+}`
+    },
+    // КЭШИРОВАНИЕ
+    {
       keywords: ['кэш', 'cache', 'кэшировани'],
       title: "Кэширование данных",
+      category: "cache",
       explanation: "Паттерн get-or-set кэширования",
       code: `public function getPopularItems(): array {
 
@@ -335,96 +456,687 @@ export function getCodeExample(task: string): object {
             ->limit(10)
             ->get('myaddon_items');
 
-        $cache->set($key, $items, 3600); // кэш на 1 час
+        $cache->set($key, $items, 3600);
     }
 
     return $items ?: [];
-}
-
-// Очищать кэш при изменении данных:
-public function updateItem(int $id, array $data): void {
-    $this->model->update('myaddon_items', $id, $data);
-    cmsCache::getInstance()->clean('myaddon.popular.list');
 }`
     },
+    {
+      keywords: ['cache set', 'cache get', 'cache clean', 'cmscache'],
+      title: "cmsCache API — set, get, clean",
+      category: "cache",
+      explanation: "Базовые операции с кэшем",
+      code: `$cache = cmsCache::getInstance();
+
+// SET — записать в кэш (TTL в секундах)
+$cache->set('my_key', $data, 3600);  // 1 час
+$cache->set('my_key', $data, 86400); // 1 день
+
+// GET — получить из кэша (false если нет)
+$data = $cache->get('my_key');
+if ($data === false) {
+    // Ключ не найден или истёк
+    $data = $this->loadFromDb();
+    $cache->set('my_key', $data, 3600);
+}
+
+// CLEAN — очистить кэш по ключу
+$cache->clean('my_key');              // один ключ
+$cache->clean('myaddon.items');       // все ключи начинающиеся с 'myaddon.items'
+$cache->clean();                      // ОЧИСТИТЬ ВЕСЬ КЭШ (осторожно!)`
+    },
+    {
+      keywords: ['cache pause', 'cache resume', 'отключить кэш'],
+      title: "Временное отключение кэша",
+      category: "cache",
+      explanation: "pause/resume для массовых операций",
+      code: `// Отключить кэширование во время массовой операции
+$cache = cmsCache::getInstance();
+$cache->pause();  // Кэширование отключено
+
+// ... массовая вставка/обновление ...
+foreach ($items as $item) {
+    $this->model->insert('myaddon_items', $item);
+}
+
+$cache->resume(); // Восстановить кэширование
+
+// После resume старые ключи остаются, но будут обновлены при следующем get/set`
+    },
+    {
+      keywords: ['cache options', 'cache_path', 'cache_ttl'],
+      title: "Настройки кэширования",
+      category: "cache",
+      explanation: "Конфигурация cache_method, cache_ttl",
+      code: `// system/config/autoload.php или в cmsConfig:
+$cfg = [
+    'cache_enabled' => true,
+    'cache_method'  => 'files',    // files, redis, memcache, memcached
+    'cache_ttl'     => 3600,      // TTL по умолчанию (1 час)
+    'cache_path'    => '/tmp/icms_cache/'
+];
+
+// Проверка в коде:
+if (cmsConfig::get('cache_enabled')) {
+    $cache = cmsCache::getInstance();
+    // ...
+}`
+    },
+    {
+      keywords: ['cache redis', 'memcache', 'memcached'],
+      title: "Redis/Memcached кэш",
+      category: "cache",
+      explanation: "Использование Redis или Memcached",
+      code: `// В config/autoload.php:
+$cfg = [
+    'cache_enabled' => true,
+    'cache_method'  => 'redis',      // redis, memcache, memcached
+    'cache_ttl'     => 7200,
+    'cache_host'    => '127.0.0.1',
+    'cache_port'    => 6379
+];
+
+// API одинаковый для всех методов:
+$cache = cmsCache::getInstance();
+$cache->set('key', $data, 3600);
+$data = $cache->get('key');
+$cache->clean('key');`
+    },
+    {
+      keywords: ['cache page', 'page cache', 'старт стоп'],
+      title: "Кэширование страниц",
+      category: "cache",
+      explanation: "start/stop для полного кэширования страницы",
+      code: `// В bootstrap.php или начале action:
+cmsCache::getInstance()->start();
+
+// ... вся логика страницы ...
+
+cmsCache::getInstance()->stop();
+
+// Внимание: start/stop работают только если cache_method поддерживает это
+// (не все cacher-ы имеют start/stop: Files — имеет, Redis — нет)`
+    },
+    {
+      keywords: ['cache dependency', 'depends', 'зависимос'],
+      title: "Инвалидация кэша при изменениях",
+      category: "cache",
+      explanation: "Чистка кэша при добавлении/редактировании/удалении",
+      code: `// При добавлении элемента:
+public function actionAdd() {
+    // ... сохранение ...
+    $id = $this->model->insert('myaddon_items', $data);
+    
+    // Чистим кэш списков
+    cmsCache::getInstance()->clean('myaddon.list');
+    cmsCache::getInstance()->clean('myaddon.popular');
+    
+    return $this->redirect(...);
+}
+
+// При редактировании:
+public function actionEdit($id) {
+    // ... обновление ...
+    $this->model->update('myaddon_items', $id, $data);
+    
+    // Чистим кэш конкретного элемента и списков
+    cmsCache::getInstance()->clean('myaddon.item.' . $id);
+    cmsCache::getInstance()->clean('myaddon.list');
+    
+    return $this->redirect(...);
+}
+
+// При удалении:
+public function actionDelete($id) {
+    $this->model->delete('myaddon_items', $id);
+    
+    cmsCache::getInstance()->clean('myaddon.item.' . $id);
+    cmsCache::getInstance()->clean('myaddon.list');
+    cmsCache::getInstance()->clean('myaddon.popular');
+}`
+    },
+    {
+      keywords: ['cache tag', 'key pattern', 'group'],
+      title: "Именование ключей кэша",
+      category: "cache",
+      explanation: "Соглашение об именовании для групповой инвалидации",
+      code: `// Соглашение: используйте точки для группировки
+// Формат: {addon}.{entity}.{specific}
+
+// Группы:
+myaddon.list              — список всех элементов
+myaddon.item.{id}         — конкретный элемент
+myaddon.popular           — популярные элементы  
+myaddon.categories        — категории
+myaddon.user.{id}         — данные пользователя
+
+// Примеры использования:
+$cache->set('myaddon.list', $items, 3600);
+$cache->set('myaddon.item.' . $id, $item, 7200);
+$cache->set('myaddon.popular', $popular, 1800);
+
+// Чистка группы:
+$cache->clean('myaddon'); // Чистит ВСЕ ключи myaddon.*`
+    },
+    // ХУКИ И СОБЫТИЯ
     {
       keywords: ['хук', 'hook', 'событи', 'event'],
       title: "Создание и вызов хука",
-      explanation: "Как добавить свои хуки для расширяемости дополнения",
-      code: `// 1. Запуск хука в вашем коде (для расширяемости):
+      category: "hooks",
+      explanation: "Как добавить свои хуки для расширяемости",
+      code: `// 1. Запуск хука:
 $item = cmsEventsManager::hook('myaddon_before_item', $item);
-// Другие дополнения могут модифицировать $item через хук 'myaddon_before_item'
 
-// 2. Реализация хука другого дополнения в файле hooks/content_after_add_approve.php:
-class onMyaddonContentAfterAddApprove extends cmsAction {
+// 2. В manifest.xml:
+<hooks>
+    <hook event="myaddon_before_item" />
+</hooks>
 
+// 3. Реализация хука:
+class onMyaddonBeforeItem extends cmsAction {
     public function run($data) {
-
-        $ctype_name = $data['ctype_name'];
-        $item       = $data['item'];
-
-        // Добавить запись в свою систему
-        $this->model->insert('myaddon_notifications', [
-            'type'       => 'new_content',
-            'target_id'  => $item['id'],
-            'user_id'    => $item['user_id'],
-            'created_at' => date('Y-m-d H:i:s')
-        ]);
-
-        return $data; // ОБЯЗАТЕЛЬНО
+        $item = $data['item'];
+        $item['custom_field'] = 'processed';
+        return $data;
     }
-
 }`
     },
+    // ПРАВА ДОСТУПА
     {
-      keywords: ['прав', 'перм', 'permission', 'acl', 'доступ'],
+      keywords: ['прав', 'перм', 'permission', 'acl', 'доступ', 'is_admin'],
       title: "Проверка прав доступа",
+      category: "permissions",
       explanation: "Работа с системой прав пользователей",
       code: `public function actionSecure() {
 
-    // Проверить авторизацию
     if (!$this->cms_user->is_logged) {
         return $this->redirect(href_to('auth', 'login'));
     }
 
-    // Проверить конкретное право
     if (!$this->cms_user->checkAccess('myaddon', 'can_post')) {
         return $this->cms_template->render('no_access');
     }
 
-    // Проверить роль
     if (!$this->cms_user->isInGroup('admins')) {
         return cmsCore::error404();
     }
 
-    // Для регистрации своих прав — используйте хук:
-    // controller_{name}_perms
     return $this->cms_template->render('secure_page');
 }`
     },
+    // ФАЙЛЫ И ИЗОБРАЖЕНИЯ
     {
-      keywords: ['файл', 'upload', 'загруз', 'изображ', 'image'],
+      keywords: ['файл', 'upload', 'загруз', 'изображ', 'image', 'file'],
       title: "Загрузка файлов/изображений",
-      explanation: "Работа с загрузкой файлов через форму",
-      code: `// В форме (forms/form_item.php):
+      category: "files",
+      explanation: "Работа с загрузкой файлов через поле fieldImage",
+      code: `// В форме:
 new fieldImage('photo', [
     'title'     => 'Фото',
     'max_width' => 800,
     'max_height'=> 600,
-    'max_size'  => 2048  // KB
+    'max_size'  => 2048
 ]),
 
-// В контроллере после сохранения формы:
+// В контроллере:
 public function actionAdd() {
     $form = $this->makeForm('form_item');
     if ($this->request->isPost()) {
         $item_data = $form->parse($this->request->data('post'));
-        // $item_data['photo'] содержит путь к загруженному файлу
-        if ($form->validate($item_data)) {
-            $this->model->insert('myaddon_items', $item_data);
-        }
+        // $item_data['photo'] содержит путь к файлу
     }
 }`
+    },
+    // RSS
+    {
+      keywords: ['rss', 'feed', 'лент'],
+      title: "RSS лента",
+      category: "rss",
+      explanation: "Генерация RSS ленты для контента",
+      code: `public function actionRss() {
+
+    $items = $this->model
+        ->filterEqual('is_pub', 1)
+        ->orderBy('date_pub', 'desc')
+        ->limit(20)
+        ->get('myaddon_items');
+
+    $feed = [
+        'title'       => cmsConfig::get('sitename') . ' - ' . $this->options['title'],
+        'description' => $this->options['description'],
+        'link'        => cmsConfig::get('root_domain'),
+        'language'    => 'ru',
+        'items'       => []
+    ];
+
+    foreach ($items as $item) {
+        $feed['items'][] = [
+            'title'       => $item['title'],
+            'link'        => href_to($this->name, 'view', $item['id']),
+            'description' => $item['description'],
+            'pubDate'    => $item['date_pub']
+        ];
+    }
+
+    return $this->cms_template->renderRSS($feed);
+}`
+    },
+    // SITEMAP
+    {
+      keywords: ['sitemap', 'site', 'map', 'поисковик', 'seo'],
+      title: "Генерация sitemap",
+      category: "sitemap",
+      explanation: "Интеграция с модулем sitemap",
+      code: `// 1. В manifest.xml:
+<hooks>
+    <hook event="sitemap_sources" />
+    <hook event="sitemap_urls" />
+</hooks>
+
+// 2. hooks/sitemap_sources.php:
+class onMyaddonSitemapSources extends cmsAction {
+    public function run($data) {
+        $data['sources'][] = [
+            'name'   => $this->name,
+            'title'  => $this->options['title'],
+            'urls'   => href_to($this->name)
+        ];
+        return $data;
+    }
+}
+
+// 3. hooks/sitemap_urls.php:
+class onMyaddonSitemapUrls extends cmsAction {
+    public function run($data) {
+        $items = $this->model
+            ->filterEqual('is_pub', 1)
+            ->orderBy('date_pub', 'desc')
+            ->limit(1000)
+            ->get('myaddon_items');
+
+        foreach ($items as $item) {
+            $data['urls'][] = [
+                'loc'        => href_to($this->name, 'view', $item['id']),
+                'lastmod'    => $item['date_pub'],
+                'priority'   => 0.7,
+                'changefreq' => 'weekly'
+            ];
+        }
+        return $data;
+    }
+}`
+    },
+    // ПОИСК
+    {
+      keywords: ['search', 'поиск', 'fulltext', 'найти'],
+      title: "Интеграция с поиском",
+      category: "search",
+      explanation: "Добавление контента в поисковый индекс",
+      code: `// 1. manifest.xml:
+<hooks>
+    <hook event="search_sources" />
+    <hook event="search_item" />
+    <hook event="delete_item" />
+</hooks>
+
+// 2. hooks/search_sources.php:
+class onMyaddonSearchSources extends cmsAction {
+    public function run($data) {
+        $data['sources'][] = [
+            'name'  => $this->name,
+            'url'   => href_to($this->name),
+            'item_url' => href_to($this->name, 'view', '%id%')
+        ];
+        return $data;
+    }
+}
+
+// 3. hooks/search_item.php:
+class onMyaddonSearchItem extends cmsAction {
+    public function run($data) {
+        if ($data['ctype_name'] !== $this->name) { return $data; }
+        
+        $item = $this->model->getItemByField('myaddon_items', 'id', $data['item_id']);
+        if ($item) {
+            $data['title'] = $item['title'];
+            $data['content'] = $item['description'] . ' ' . $item['content'];
+        }
+        return $data;
+    }
+}`
+    },
+    // ТЕГИ
+    {
+      keywords: ['tag', 'тег', 'tags'],
+      title: "Работа с тегами",
+      category: "tags",
+      explanation: "Интеграция с системой тегов",
+      code: `// 1. manifest.xml:
+<hooks>
+    <hook event="tagsdelete" />
+</hooks>
+
+// 2. При сохранении элемента - привязка тегов:
+$tags = $this->request->post('tags', []);
+cmsCore::getModel('tags')->bindTags($tags, $item_id, $this->name);
+
+// 3. При удалении - очистка тегов:
+$this->model->deleteFiltered('tags_items', ['target_id' => $item_id]);`
+    },
+    // КАТЕГОРИИ
+    {
+      keywords: ['categor', 'категор', 'parent'],
+      title: "Иерархия категорий",
+      category: "categories",
+      explanation: "Работа с вложенными категориями",
+      code: `// Получить дерево категорий:
+$cats = $this->model->getCategoriesTree($ctype['name']);
+
+// Формат результата:
+[
+    ['id' => 1, 'title' => 'Parent', 'level' => 0, 'children' => [
+        ['id' => 2, 'title' => 'Child', 'level' => 1, 'children' => []]
+    ]]
+]
+
+// Получить категорию с родителями:
+$path = $this->model->getCategoryPath($category_id);
+
+// ID всех потомков категории:
+$child_ids = $this->model->getCategoryChildren($category_id);`
+    },
+    // РЕЙТИНГ
+    {
+      keywords: ['rating', 'рейтинг', 'голос'],
+      title: "Интеграция с рейтингом",
+      category: "rating",
+      explanation: "Добавление голосования к элементам",
+      code: `// 1. manifest.xml:
+<hooks>
+    <hook event="rating_vote" />
+</hooks>
+
+// 2. hooks/rating_vote.php:
+class onMyaddonRatingVote extends cmsAction {
+    public function run($data) {
+        if ($data['target'] !== $this->name) { return $data; }
+        
+        $this->model->increment('myaddon_items', $data['target_id'], 'rating_sum', $data['vote']);
+        $this->model->increment('myaddon_items', $data['target_id'], 'rating_count', 1);
+        
+        return $data;
+    }
+}`
+    },
+    // КОММЕНТАРИИ
+    {
+      keywords: ['comment', 'коммент'],
+      title: "Интеграция с комментариями",
+      category: "comments",
+      explanation: "Включение комментариев к элементам",
+      code: `// 1. manifest.xml:
+<hooks>
+    <hook event="comments_count" />
+</hooks>
+
+// 2. В типе контента включить комментарии в админке
+
+// 3. hooks/comments_count.php:
+class onMyaddonCommentsCount extends cmsAction {
+    public function run($data) {
+        if ($data['ctype_name'] !== $this->name) { return $data; }
+        
+        $count = $this->model->getCommentsCount($data['item_id']);
+        $data['comments_count'] = $count;
+        return $data;
+    }
+}`
+    },
+    // УВЕДОМЛЕНИЯ
+    {
+      keywords: ['notice', 'уведомл', 'email', 'notification'],
+      title: "Отправка уведомлений",
+      category: "notifications",
+      explanation: "Отправка email и in-site уведомлений",
+      code: `// Email уведомление:
+cmsCore::sendEmail([
+    'to'      => $user_email,
+    'subject' => 'Новое уведомление',
+    'body'    => "Привет, {$user_name}!\\n\\n{$message}"
+], $this->cms_config);
+
+// In-site уведомление:
+cmsCore::getController('messages')->addNotice($user_id, 'myaddon_notification', [
+    'content' => $message,
+    'options' => ['link' => href_to($this->name, 'view', $item_id)]
+]);`
+    },
+    // SEO
+    {
+      keywords: ['seo', 'meta', 'title', 'description', 'og'],
+      title: "SEO метатеги",
+      category: "seo",
+      explanation: "Настройка метатегов для страниц",
+      code: `// В action:
+public function actionView($id) {
+    $item = $this->model->getItemByField('myaddon_items', 'id', $id);
+    if (!$item) { return cmsCore::error404(); }
+
+    $this->cms_template->setPageTitle($item['title']);
+    $this->cms_template->setPageDescription($item['description']);
+    $this->cms_template->addHeadOpenGraph([
+        'og:title'       => $item['title'],
+        'og:description' => $item['description'],
+        'og:image'        => $item['photo'] ? cmsConfig::get('uploads_url') . '/' . $item['photo'] : '',
+        'og:url'          => href_to($this->name, 'view', $item['id'])
+    ]);
+
+    return $this->cms_template->render('view', ['item' => $item]);
+}`
+    },
+    // CRUD COMPLETE
+    {
+      keywords: ['crud', 'create', 'read', 'update', 'delete', 'полный'],
+      title: "Полный CRUD контроллер",
+      category: "crud",
+      explanation: "Шаблон минимального CRUD контроллера",
+      code: `class myaddon extends cmsFrontend {
+
+    // Список
+    public function actionIndex() {
+        $page = $this->request->get('page', 1);
+        $total = $this->model->getCount('myaddon_items');
+        $items = $this->model->limitPage($page, 10)->get('myaddon_items');
+        return $this->cms_template->render('index', ['items' => $items, 'total' => $total]);
+    }
+
+    // Просмотр
+    public function actionView($id) {
+        $item = $this->model->getItemByField('myaddon_items', 'id', $id);
+        if (!$item) { return cmsCore::error404(); }
+        return $this->cms_template->render('view', ['item' => $item]);
+    }
+
+    // Добавление
+    public function actionAdd() {
+        if ($this->request->isPost()) {
+            $id = $this->model->insert('myaddon_items', $this->request->data('post'));
+            return $this->redirect(href_to($this->name, 'view', $id));
+        }
+        return $this->cms_template->render('add');
+    }
+
+    // Удаление
+    public function actionDelete($id) {
+        $this->model->delete('myaddon_items', $id);
+        return $this->redirect(href_to($this->name));
+    }
+}`
+    },
+    // МИГРАЦИЯ БД
+    {
+      keywords: ['migration', 'install', 'uninstall', 'sql', 'таблиц'],
+      title: "Создание таблиц при установке",
+      category: "migration",
+      explanation: "Пример install.php с созданием таблицы",
+      code: `class installerMyaddon extends cmsInstaller {
+
+    public function install() {
+
+        // Создание таблицы
+        $this->createTable('myaddon_items', [
+            'id'          => 'INT UNSIGNED AUTO_INCREMENT PRIMARY KEY',
+            'title'       => 'VARCHAR(255) NOT NULL',
+            'description' => 'TEXT',
+            'user_id'     => 'INT UNSIGNED DEFAULT NULL',
+            'date_pub'    => 'DATETIME DEFAULT NULL',
+            'is_pub'      => 'TINYINT(1) UNSIGNED DEFAULT 1',
+            'ordering'    => 'INT UNSIGNED DEFAULT 0'
+        ], 'Документы');
+
+        // Добавление индекса
+        $this->db->query("CREATE INDEX idx_user ON {myaddon_items} (user_id)");
+
+        return true;
+    }
+
+    public function uninstall() {
+        $this->dropTable('myaddon_items');
+        return true;
+    }
+}`,
+    },
+    // SECURITY - XSS
+    {
+      keywords: ['xss', 'html', 'escape', 'безопасност', 'sanitize'],
+      title: "Защита от XSS",
+      category: "security",
+      explanation: "Фильтрация HTML и экранирование вывода",
+      code: `// 1. В модели - валидация HTML:
+public function validateHtml($content) {
+    // Разрешённые теги
+    $allowed = '<p><a><strong><em><ul><ol><li><br>';
+    return strip_tags($content, $allowed);
+}
+
+// 2. В шаблоне - экранирование:
+<?php html($item['content']); ?>
+<?php htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8'); ?>
+
+// 3. Не доверяйте пользовательскому вводу:
+$title = strip_tags($this->request->get('title', ''));
+$title = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');`
+    },
+    // SECURITY - CSRF
+    {
+      keywords: ['csrf', 'token', 'form', 'csrf_token'],
+      title: "Защита от CSRF",
+      category: "security",
+      explanation: "CSRF токен для форм и AJAX запросов",
+      code: `// 1. В форме - добавление токена:
+<form method="post">
+    <?php csrf_field(); ?>
+    <input type="text" name="title">
+</form>
+
+// 2. В AJAX - отправка токена:
+$.ajax({
+    url: '/myaddon/save',
+    type: 'POST',
+    data: {
+        title: 'Test',
+        csrf_token: '<?php cmsUser::csrfToken(); ?>'
+    }
+});
+
+// 3. В контроллере - проверка:
+if ($this->request->isPost()) {
+    if (!cmsForm::validateCSRFToken($this->request->get('csrf_token'))) {
+        return $this->renderJSON(['error' => 'Invalid token']);
+    }
+}`
+    },
+    // SECURITY - SQL INJECTION
+    {
+      keywords: ['sql', 'injection', 'query', 'базы'],
+      title: "Защита от SQL Injection",
+      category: "security",
+      explanation: "Использование query builder вместо сырых запросов",
+      code: `// ✅ ПРАВИЛЬНО - используйте model:
+$items = $this->model
+    ->filterEqual('user_id', $user_id)  // параметризованный запрос
+    ->get('myaddon_items');
+
+// ✅ JSON запросы через модель:
+$id = $this->request->get('id', 0);
+$item = $this->model->getItemByField('myaddon_items', 'id', (int)$id);
+
+// ❌ НЕПРАВИЛЬНО - сырой запрос:
+$query = "SELECT * FROM cms_myaddon WHERE id = " . $_GET['id']; // УЯЗВИМОСТЬ!
+
+// ✅ Если нужен сырой запрос - используйте параметры:
+$this->db->query("SELECT * FROM {myaddon_items} WHERE id = %d", $id);`
+    },
+    // SECURITY - ACCESS CONTROL
+    {
+      keywords: ['access', 'rbac', 'роль', 'admin', 'moderator'],
+      title: "RBAC - Контроль доступа",
+      category: "security",
+      explanation: "Проверка прав по ролям и группам",
+      code: `// 1. Проверка группы:
+if (!$this->cms_user->isInGroup('admins')) {
+    return cmsCore::error403();
+}
+
+// 2. Проверка прав компонента:
+if (!$this->cms_user->checkAccess('myaddon', 'view')) {
+    return cmsCore::error403();
+}
+
+// 3. Проверка владельца:
+if ($item['user_id'] !== $this->cms_user->id && !$this->cms_user->is_admin) {
+    return cmsCore::error403();
+}
+
+// 4. В manifest.xml - регистрация прав:
+<permissions>
+    <item name="view" title="Просмотр" />
+    <item name="add" title="Добавление" />
+    <item name="edit" title="Редактирование" />
+    <item name="delete" title="Удаление" />
+</permissions>`
+    },
+    // SECURITY - FILE UPLOAD
+    {
+      keywords: ['upload', 'file', 'безопасн', 'extension'],
+      title: "Безопасная загрузка файлов",
+      category: "security",
+      explanation: "Проверка типа и размера файла",
+      code: `// 1. Проверка расширения:
+$allowed = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx'];
+$ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+if (!in_array($ext, $allowed)) {
+    return ['error' => 'Недопустимый тип файла'];
+}
+
+// 2. Проверка MIME типа:
+$finfo = finfo_open(FILEINFO_MIME_TYPE);
+$mime = finfo_file($finfo, $tmp_name);
+finfo_close($finfo);
+$allowed_mime = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+if (!in_array($mime, $allowed_mime)) {
+    return ['error' => 'Недопустимый тип файла'];
+}
+
+// 3. Проверка размера:
+$max_size = 5 * 1024 * 1024; // 5MB
+if ($file_size > $max_size) {
+    return ['error' => 'Файл слишком большой'];
+}
+
+// 4. Генерация случайного имени:
+$new_name = md5(uniqid()) . '.' . $ext;`
     }
   ];
 
@@ -436,7 +1148,8 @@ public function actionAdd() {
     return {
       message: "Точный пример не найден. Доступные темы:",
       available_topics: examples.map(ex => ex.title),
-      tip: "Уточните запрос: 'список с пагинацией', 'обработка формы', 'AJAX', 'кэширование', 'хуки', 'права доступа', 'загрузка файлов'"
+      categories: [...new Set(examples.map(ex => ex.category))],
+      tip: "Попробуйте: 'список', 'ajax', 'форма', 'кэш', 'права', 'rss', 'sitemap', 'поиск', 'теги', 'рейтинг', 'уведомления', 'crud', 'миграция'"
     };
   }
 
@@ -445,6 +1158,7 @@ public function actionAdd() {
     found: matched.length,
     examples: matched.map(ex => ({
       title: ex.title,
+      category: ex.category,
       explanation: ex.explanation,
       code: ex.code
     }))

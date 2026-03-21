@@ -20,8 +20,11 @@ dist/
 # Editors
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
+*.md
+*.html
 
 # Logs
 npm-debug.log*
@@ -31,3 +34,5 @@ yarn-error.log*
 # npm
 .npm
 package-lock.json
+
+source/

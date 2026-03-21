@@ -283,6 +283,100 @@ $this->model->filterEqual('user_id', $user_id)->updateFiltered('myaddon_items', 
         ],
         return_type: "static",
         example: `$stats = $this->model->select('user_id, COUNT(*) as cnt')->groupBy('user_id')->get('myaddon_items');`
+      },
+      {
+        name: "increment",
+        signature: "increment(string $table, int $id, string $field, int $step = 1): bool",
+        description: "Инкремент поля в записи",
+        parameters: [
+          { name: "$table", type: "string", description: "Таблица", required: true },
+          { name: "$id", type: "int", description: "ID записи", required: true },
+          { name: "$field", type: "string", description: "Поле для инкремента", required: true },
+          { name: "$step", type: "int", description: "Шаг инкремента", default: "1" }
+        ],
+        return_type: "bool",
+        example: `$this->model->increment('myaddon_items', $id, 'views');`
+      },
+      {
+        name: "decrement",
+        signature: "decrement(string $table, int $id, string $field, int $step = 1): bool",
+        description: "Декремент поля в записи",
+        parameters: [
+          { name: "$table", type: "string", description: "Таблица", required: true },
+          { name: "$id", type: "int", description: "ID записи", required: true },
+          { name: "$field", type: "string", description: "Поле для декремента", required: true },
+          { name: "$step", type: "int", description: "Шаг декремента", default: "1" }
+        ],
+        return_type: "bool",
+        example: `$this->model->decrement('myaddon_items', $id, 'count');`
+      },
+      {
+        name: "distinctSelect",
+        signature: "distinctSelect(string $fields): static",
+        description: "DISTINCT SELECT для уникальных значений",
+        parameters: [
+          { name: "$fields", type: "string", description: "Поля", required: true }
+        ],
+        return_type: "static",
+        example: `$items = $this->model->distinctSelect('DISTINCT user_id')->get('myaddon_items');`
+      },
+      {
+        name: "having",
+        signature: "having(string $field, string $operator, mixed $value): static",
+        description: "Условие HAVING для GROUP BY",
+        parameters: [
+          { name: "$field", type: "string", description: "Поле", required: true },
+          { name: "$operator", type: "string", description: "Оператор: >, <, =, >=, <=", required: true },
+          { name: "$value", type: "mixed", description: "Значение", required: true }
+        ],
+        return_type: "static",
+        example: `$stats = $this->model->select('user_id, COUNT(*) as cnt')->groupBy('user_id')->having('cnt', '>', 5)->get('myaddon_items');`
+      },
+      {
+        name: "resetFilters",
+        signature: "resetFilters(): void",
+        description: "Сброс всех фильтров WHERE",
+        parameters: [],
+        return_type: "void",
+        example: `$this->model->resetFilters()->limit(10)->get('myaddon_items');`
+      },
+      {
+        name: "enableMultiInsert",
+        signature: "enableMultiInsert(): void",
+        description: "Включить режим множественной вставки (batch insert)",
+        parameters: [],
+        return_type: "void",
+        example: `$this->model->enableMultiInsert()->insert('myaddon_items', $batch);`
+      },
+      {
+        name: "getJoinedTables",
+        signature: "getJoinedTables(): array",
+        description: "Получить список присоединённых таблиц",
+        parameters: [],
+        return_type: "array",
+        example: `$tables = $this->model->getJoinedTables();`
+      },
+      {
+        name: "joinInner",
+        signature: "joinInner(string $table, string $on): static",
+        description: "INNER JOIN таблицы",
+        parameters: [
+          { name: "$table", type: "string", description: "Таблица", required: true },
+          { name: "$on", type: "string", description: "ON условие", required: true }
+        ],
+        return_type: "static",
+        example: `$items = $this->model->joinInner('cms_users', 'cms_users.id = i.user_id')->get('myaddon_items i');`
+      },
+      {
+        name: "joinLeft",
+        signature: "joinLeft(string $table, string $on): static",
+        description: "LEFT JOIN таблицы",
+        parameters: [
+          { name: "$table", type: "string", description: "Таблица", required: true },
+          { name: "$on", type: "string", description: "ON условие", required: true }
+        ],
+        return_type: "static",
+        example: `$items = $this->model->joinLeft('cms_users', 'cms_users.id = i.user_id')->get('myaddon_items i');`
       }
     ]
   },
@@ -1432,6 +1526,975 @@ function grid_items($controller) {
         parameters: [],
         return_type: "void",
         example: `<?= $this->onDemandPrint() ?>`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsUser — авторизация, сессии, работа с пользователем
+  // system/core/user.php
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsUser",
+    class: "cmsUser",
+    description: "Класс для работы с текущим пользователем. Singleton. Содержит данные авторизованного пользователя, группы, друзей, сессии и права доступа.",
+    access: "cmsUser::getInstance() — глобально. $this->cms_user — в контроллере.",
+    methods: [
+      {
+        name: "login",
+        signature: "login(string $email, string $password, bool $remember = false, bool $complete_login = true, $model = null): int|array",
+        description: "Авторизует пользователя по email и паролю. Возвращает ID пользователя или массив (если complete_login=false).",
+        parameters: [
+          { name: "$email", type: "string", description: "Email пользователя", required: true },
+          { name: "$password", type: "string", description: "Пароль", required: true },
+          { name: "$remember", type: "bool", description: "Запомнить на 100 дней (cookie)", default: "false" },
+          { name: "$complete_login", type: "bool", description: "Завершить авторизацию сразу", default: "true" }
+        ],
+        return_type: "int|array",
+        example: `$user_id = cmsUser::login($email, $password);
+if (!$user_id) {
+    cmsUser::addSessionMessage('Неверный email или пароль', 'error');
+}`
+      },
+      {
+        name: "logout",
+        signature: "logout(): bool",
+        description: "Выход пользователя из системы. Удаляет сессию, online-запись, cookie авторизации.",
+        parameters: [],
+        return_type: "bool",
+        example: `cmsUser::logout();
+$this->redirect(href_to('auth', 'login'));`
+      },
+      {
+        name: "isLogged",
+        signature: "isLogged(): bool",
+        description: "Проверяет, авторизован ли текущий пользователь",
+        parameters: [],
+        return_type: "bool",
+        example: `if (!cmsUser::isLogged()) {
+    return $this->redirectToLogin();
+}`
+      },
+      {
+        name: "isAdmin",
+        signature: "isAdmin(): bool",
+        description: "Проверяет, является ли текущий пользователь администратором",
+        parameters: [],
+        return_type: "bool",
+        example: `if (cmsUser::isAdmin()) {
+    // действия для админа
+}`
+      },
+      {
+        name: "get",
+        signature: "get(string $key): mixed",
+        description: "Получить свойство пользователя (id, email, nickname, groups и т.д.)",
+        parameters: [
+          { name: "$key", type: "string", description: "Имя свойства", required: true }
+        ],
+        return_type: "mixed",
+        example: `$user_id = cmsUser::get('id');
+$groups = cmsUser::get('groups');`
+      },
+      {
+        name: "isInGroup",
+        signature: "isInGroup(int $group_id): bool",
+        description: "Проверяет членство пользователя в группе",
+        parameters: [
+          { name: "$group_id", type: "int", description: "ID группы", required: true }
+        ],
+        return_type: "bool",
+        example: `if (!$this->cms_user->isInGroup(GUEST_GROUP_ID)) {
+    // не гость
+}`
+      },
+      {
+        name: "setUPS",
+        signature: "setUPS(string $key, mixed $data, int $user_id = null): bool",
+        description: "Устанавливает пользовательскую настройку (User Personal Setting)",
+        parameters: [
+          { name: "$key", type: "string", description: "Ключ настройки", required: true },
+          { name: "$data", type: "mixed", description: "Значение", required: true },
+          { name: "$user_id", type: "int", description: "ID пользователя (по умолчанию текущий)", required: false }
+        ],
+        return_type: "bool",
+        example: `cmsUser::setUPS('notify_email', ['freq' => 'daily'], $user_id);`
+      },
+      {
+        name: "getUPS",
+        signature: "getUPS(string $key, int $user_id = null): mixed",
+        description: "Получает пользовательскую настройку",
+        parameters: [
+          { name: "$key", type: "string", description: "Ключ настройки", required: true },
+          { name: "$user_id", type: "int", description: "ID пользователя", required: false }
+        ],
+        return_type: "mixed",
+        example: `$settings = cmsUser::getUPS('notify_email', $user_id);`
+      },
+      {
+        name: "addSessionMessage",
+        signature: "addSessionMessage(string $message, string $class = 'info', bool $is_keep = false): void",
+        description: "Добавляет сообщение в сессию для отображения после редиректа",
+        parameters: [
+          { name: "$message", type: "string", description: "Текст сообщения", required: true },
+          { name: "$class", type: "string", description: "CSS-класс: info, success, warning, error", default: "'info'" },
+          { name: "$is_keep", type: "bool", description: "Сохранить после показа", default: "false" }
+        ],
+        return_type: "void",
+        example: `cmsUser::addSessionMessage('Профиль обновлён!', 'success');
+return $this->redirect(href_to('profile'));`
+      },
+      {
+        name: "getPermissionValue",
+        signature: "getPermissionValue(string $subject, string $permission): mixed",
+        description: "Получить значение разрешения для пользователя",
+        parameters: [
+          { name: "$subject", type: "string", description: "Субъект (имя контроллера)", required: true },
+          { name: "$permission", type: "string", description: "Имя разрешения", required: true }
+        ],
+        return_type: "mixed",
+        example: `$can_edit = cmsUser::getPermissionValue('catalog', 'edit');`
+      },
+      {
+        name: "isAllowed",
+        signature: "isAllowed(string $subject, string $permission, mixed $value = true, bool $is_admin_strict = false): bool",
+        description: "Проверяет, разрешено ли действие",
+        parameters: [
+          { name: "$subject", type: "string", description: "Субъект", required: true },
+          { name: "$permission", type: "string", description: "Разрешение", required: true },
+          { name: "$value", type: "mixed", description: "Ожидаемое значение", default: "true" },
+          { name: "$is_admin_strict", type: "bool", description: "Не давать админу особые права", default: "false" }
+        ],
+        return_type: "bool",
+        example: `if (!cmsUser::isAllowed('catalog', 'add_item')) {
+    cmsCore::error404();
+}`
+      },
+      {
+        name: "isDenied",
+        signature: "isDenied(string $subject, string $permission, mixed $value = true, bool $is_admin_strict = false): bool",
+        description: "Проверяет, запрещено ли действие",
+        parameters: [
+          { name: "$subject", type: "string", description: "Субъект", required: true },
+          { name: "$permission", type: "string", description: "Разрешение", required: true },
+          { name: "$value", type: "mixed", description: "Проверяемое значение", default: "true" },
+          { name: "$is_admin_strict", type: "bool", description: "Строгая проверка", default: "false" }
+        ],
+        return_type: "bool",
+        example: `if (cmsUser::isDenied('content', 'is_premium', 1)) {
+    return cmsCore::error404();
+}`
+      },
+      {
+        name: "autoLogin",
+        signature: "autoLogin(string $auth_token): int",
+        description: "Авторизует пользователя по cookie-токену. Вызывается автоматически при загрузке cmsUser.",
+        parameters: [
+          { name: "$auth_token", type: "string", description: "128-символьный SHA512 токен", required: true }
+        ],
+        return_type: "int",
+        example: `// Вызывается автоматически в конструкторе cmsUser`
+      },
+      {
+        name: "setCookie",
+        signature: "setCookie(string $key, string $value, int $time = 3600, string $path = '/', bool $http_only = true, string $domain = ''): bool",
+        description: "Устанавливает cookie с префиксом 'icms['",
+        parameters: [
+          { name: "$key", type: "string", description: "Имя cookie", required: true },
+          { name: "$value", type: "string", description: "Значение", required: true },
+          { name: "$time", type: "int", description: "Время жизни в секундах", default: "3600" },
+          { name: "$path", type: "string", description: "Путь", default: "'/'" },
+          { name: "$http_only", type: "bool", description: "Доступен только для PHP", default: "true" },
+          { name: "$domain", type: "string", description: "Домен", default: "''" }
+        ],
+        return_type: "bool",
+        example: `cmsUser::setCookie('my_cookie', 'value', 86400);`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsPermissions — система прав доступа
+  // system/core/permissions.php
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsPermissions",
+    class: "cmsPermissions",
+    description: "Система разрешений и прав доступа. Проверяет membership в группах, лимиты, флаги.",
+    access: "$this->cms_user->perms — в контроллере. cmsUser::getInstance()->perms",
+    methods: [
+      {
+        name: "getPermissionValue",
+        signature: "getPermissionValue(string $subject, string $permission): mixed",
+        description: "Возвращает значение конкретного разрешения для субъекта",
+        parameters: [
+          { name: "$subject", type: "string", description: "Субъект (имя контроллера)", required: true },
+          { name: "$permission", type: "string", description: "Название разрешения", required: true }
+        ],
+        return_type: "mixed",
+        example: `$value = $this->cms_user->perms->getPermissionValue('catalog', 'max_items');`
+      },
+      {
+        name: "isDenied",
+        signature: "isDenied(string $subject, string $permission, mixed $value = true, bool $is_admin_strict = false): bool",
+        description: "Проверяет запрет: принадлежит ли значение указанному",
+        parameters: [
+          { name: "$subject", type: "string", description: "Субъект", required: true },
+          { name: "$permission", type: "string", description: "Разрешение", required: true },
+          { name: "$value", type: "mixed", description: "Запрещающее значение", default: "true" },
+          { name: "$is_admin_strict", type: "bool", description: "Не пропускать админа", default: "false" }
+        ],
+        return_type: "bool",
+        example: `if ($this->cms_user->perms->isDenied('catalog', 'is_locked', 1)) {
+    return cmsCore::error404();
+}`
+      },
+      {
+        name: "isAllowed",
+        signature: "isAllowed(string $subject, string $permission, mixed $value = true, bool $is_admin_strict = false): bool",
+        description: "Проверяет разрешение: совпадает ли значение с ожидаемым",
+        parameters: [
+          { name: "$subject", type: "string", description: "Субъект", required: true },
+          { name: "$permission", type: "string", description: "Разрешение", required: true },
+          { name: "$value", type: "mixed", description: "Ожидаемое значение", default: "true" },
+          { name: "$is_admin_strict", type: "bool", description: "Не пропускать админа", default: "false" }
+        ],
+        return_type: "bool",
+        example: `if (!$this->cms_user->perms->isAllowed('catalog', 'add')) {
+    cmsUser::addSessionMessage('Нет прав на добавление', 'error');
+    $this->redirectBack();
+}`
+      },
+      {
+        name: "isPermittedLimitReached",
+        signature: "isPermittedLimitReached(string $subject, string $permission, int $current_value = 0, bool $is_admin_strict = false): bool",
+        description: "Проверяет, достигнут ли лимит (current >= limit)",
+        parameters: [
+          { name: "$subject", type: "string", description: "Субъект", required: true },
+          { name: "$permission", type: "string", description: "Лимит (например, max_items)", required: true },
+          { name: "$current_value", type: "int", description: "Текущее значение", default: "0" },
+          { name: "$is_admin_strict", type: "bool", description: "Не пропускать админа", default: "false" }
+        ],
+        return_type: "bool",
+        example: `if ($this->cms_user->perms->isPermittedLimitReached('catalog', 'max_images', $image_count)) {
+    cmsUser::addSessionMessage('Достигнут лимит загрузки изображений', 'warning');
+}`
+      },
+      {
+        name: "addRule",
+        signature: "addRule(string $controller, array $rule): int|false",
+        description: "Добавляет новое правило доступа в БД (статический метод)",
+        parameters: [
+          { name: "$controller", type: "string", description: "Имя контроллера", required: true },
+          { name: "$rule", type: "array", description: "Массив: name, type (flag/list/number), options", required: true }
+        ],
+        return_type: "int|false",
+        example: `cmsPermissions::addRule('catalog', [
+    'name'    => 'use_api',
+    'type'    => 'flag',
+    'options' => ''
+]);`
+      },
+      {
+        name: "getRulesList",
+        signature: "getRulesList(string $controller): array",
+        description: "Возвращает список всех доступных правил доступа для контроллера",
+        parameters: [
+          { name: "$controller", type: "string", description: "Имя контроллера", required: true }
+        ],
+        return_type: "array",
+        example: `$rules = cmsPermissions::getRulesList('catalog');`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsDatabase — прямые SQL операции
+  // system/core/database.php
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsDatabase",
+    class: "cmsDatabase",
+    description: "Низкоуровневый класс работы с MySQL. Прямые запросы, транзакции, работа с таблицами. Обычно используется через cmsModel.",
+    access: "$this->cms_core->db — в контроллере. cmsCore::getInstance()->db.",
+    methods: [
+      {
+        name: "query",
+        signature: "query(string $sql, array|string $params = false, bool $quiet = false): mixed",
+        description: "Выполняет SQL запрос с подстановкой параметров через vsprintf",
+        parameters: [
+          { name: "$sql", type: "string", description: "SQL запрос с %s плейсхолдерами", required: true },
+          { name: "$params", type: "array|string", description: "Параметры для подстановки", required: false },
+          { name: "$quiet", type: "bool", description: "Не выводить ошибку при неудаче", required: false }
+        ],
+        return_type: "mixed",
+        example: `$result = $this->cms_core->db->query(
+    "SELECT * FROM {#}my_table WHERE id = %d AND is_active = %d",
+    [$id, 1]
+);`
+      },
+      {
+        name: "insert",
+        signature: "insert(string $table, array $data, bool $skip_check_fields = false, bool $array_as_json = false, bool $ignore = false): int|bool",
+        description: "INSERT запрос. Возвращает ID вставленной записи.",
+        parameters: [
+          { name: "$table", type: "string", description: "Имя таблицы без префикса", required: true },
+          { name: "$data", type: "array", description: "Ассоциативный массив поле => значение", required: true },
+          { name: "$skip_check_fields", type: "bool", description: "Не проверять поля в таблице", default: "false" },
+          { name: "$array_as_json", type: "bool", description: "Массивы как JSON (иначе YAML)", default: "false" },
+          { name: "$ignore", type: "bool", description: "INSERT IGNORE", default: "false" }
+        ],
+        return_type: "int|bool",
+        example: `$id = $this->cms_core->db->insert('my_items', [
+    'title'    => $title,
+    'user_id'  => $this->cms_user->id,
+    'date_add' => date('Y-m-d H:i:s')
+]);`
+      },
+      {
+        name: "update",
+        signature: "update(string $table, string $where, array $data, bool $skip_check_fields = false, bool $array_as_json = false): bool",
+        description: "UPDATE запрос",
+        parameters: [
+          { name: "$table", type: "string", description: "Имя таблицы", required: true },
+          { name: "$where", type: "string", description: "WHERE условие", required: true },
+          { name: "$data", type: "array", description: "Данные для обновления", required: true }
+        ],
+        return_type: "bool",
+        example: `$this->cms_core->db->update(
+    'my_items',
+    'id = ' . (int)$id,
+    ['title' => $title, 'is_pub' => 1]
+);`
+      },
+      {
+        name: "delete",
+        signature: "delete(string $table_name, string $where): bool",
+        description: "DELETE запрос",
+        parameters: [
+          { name: "$table_name", type: "string", description: "Имя таблицы", required: true },
+          { name: "$where", type: "string", description: "WHERE условие", required: true }
+        ],
+        return_type: "bool",
+        example: `$this->cms_core->db->delete('my_items', 'id = ' . (int)$id);`
+      },
+      {
+        name: "getRow",
+        signature: "getRow(string $table, string $where = '1', string $fields = '*', string $order = ''): array|false",
+        description: "Получает одну строку из таблицы",
+        parameters: [
+          { name: "$table", type: "string", description: "Имя таблицы", required: true },
+          { name: "$where", type: "string", description: "WHERE условие", default: "'1'" },
+          { name: "$fields", type: "string", description: "Список полей", default: "'*'" },
+          { name: "$order", type: "string", description: "ORDER BY", default: "''" }
+        ],
+        return_type: "array|false",
+        example: `$item = $this->cms_core->db->getRow('my_items', 'id = ' . (int)$id);`
+      },
+      {
+        name: "getRows",
+        signature: "getRows(string $table_name, string $where = '1', string $fields = '*', string $order = 'id ASC'): array|false",
+        description: "Получает все строки из таблицы",
+        parameters: [
+          { name: "$table_name", type: "string", description: "Имя таблицы", required: true },
+          { name: "$where", type: "string", description: "WHERE условие", default: "'1'" },
+          { name: "$fields", type: "string", description: "Список полей", default: "'*'" },
+          { name: "$order", type: "string", description: "ORDER BY", default: "'id ASC'" }
+        ],
+        return_type: "array|false",
+        example: `$items = $this->cms_core->db->getRows('my_items', 'is_pub = 1', '*', 'date_add DESC');`
+      },
+      {
+        name: "getField",
+        signature: "getField(string $table, string $where, string $field, string $order = ''): mixed",
+        description: "Получает значение одного поля",
+        parameters: [
+          { name: "$table", type: "string", description: "Имя таблицы", required: true },
+          { name: "$where", type: "string", description: "WHERE условие", required: true },
+          { name: "$field", type: "string", description: "Имя поля", required: true },
+          { name: "$order", type: "string", description: "ORDER BY", default: "''" }
+        ],
+        return_type: "mixed",
+        example: `$title = $this->cms_core->db->getField('my_items', 'id = ' . (int)$id, 'title');`
+      },
+      {
+        name: "getRowsCount",
+        signature: "getRowsCount(string $table, string $where = '1', int $limit = false): int|false",
+        description: "Возвращает количество строк",
+        parameters: [
+          { name: "$table", type: "string", description: "Имя таблицы", required: true },
+          { name: "$where", type: "string", description: "WHERE условие", default: "'1'" },
+          { name: "$limit", type: "int", description: "Лимит", default: "false" }
+        ],
+        return_type: "int|false",
+        example: `$total = $this->cms_core->db->getRowsCount('my_items', 'is_pub = 1');`
+      },
+      {
+        name: "beginTransaction",
+        signature: "beginTransaction(): cmsDatabase",
+        description: "Начинает транзакцию",
+        parameters: [],
+        return_type: "cmsDatabase",
+        example: `$this->cms_core->db->beginTransaction();
+// ... операции ...
+$this->cms_core->db->commit();`
+      },
+      {
+        name: "commit",
+        signature: "commit(): cmsDatabase",
+        description: "Фиксирует транзакцию",
+        parameters: [],
+        return_type: "cmsDatabase",
+        example: `$this->cms_core->db->commit();`
+      },
+      {
+        name: "rollback",
+        signature: "rollback(): cmsDatabase",
+        description: "Откатывает транзакцию",
+        parameters: [],
+        return_type: "cmsDatabase",
+        example: `$this->cms_core->db->rollback();`
+      },
+      {
+        name: "lastId",
+        signature: "lastId(): int",
+        description: "Возвращает ID последней вставленной записи",
+        parameters: [],
+        return_type: "int",
+        example: `$id = $this->cms_core->db->lastId();`
+      },
+      {
+        name: "escape",
+        signature: "escape(string|array $string): string|array",
+        description: "Экранирует строку или массив для SQL",
+        parameters: [
+          { name: "$string", type: "string|array", description: "Строка или массив", required: true }
+        ],
+        return_type: "string|array",
+        example: `$safe_value = $this->cms_core->db->escape($user_input);`
+      },
+      {
+        name: "prepareValue",
+        signature: "prepareValue(string $field, mixed $value, bool $array_as_json = false): string",
+        description: "Подготавливает значение поля для SQL запроса (экранирование, кавычки, NULL)",
+        parameters: [
+          { name: "$field", type: "string", description: "Имя поля (для определения типа)", required: true },
+          { name: "$value", type: "mixed", description: "Значение", required: true },
+          { name: "$array_as_json", type: "bool", description: "Массив как JSON", default: "false" }
+        ],
+        return_type: "string",
+        example: `// Используется внутренне insert/update`
+      },
+      {
+        name: "autocommitOff",
+        signature: "autocommitOff(): cmsDatabase",
+        description: "Отключает автокоммит транзакций",
+        parameters: [],
+        return_type: "cmsDatabase",
+        example: `$this->cms_core->db->autocommitOff();`
+      },
+      {
+        name: "autocommitOn",
+        signature: "autocommitOn(): cmsDatabase",
+        description: "Включает автокоммит транзакций",
+        parameters: [],
+        return_type: "cmsDatabase",
+        example: `$this->cms_core->db->autocommitOn();`
+      },
+      {
+        name: "isTableExists",
+        signature: "isTableExists(string $table_name): bool",
+        description: "Проверяет существование таблицы",
+        parameters: [
+          { name: "$table_name", type: "string", description: "Имя таблицы без префикса", required: true }
+        ],
+        return_type: "bool",
+        example: `if (!$this->cms_core->db->isTableExists('my_table')) {
+    // создать таблицу
+}`
+      },
+      {
+        name: "getTableFields",
+        signature: "getTableFields(string $table_name, bool $use_cache = true): array",
+        description: "Возвращает список полей таблицы",
+        parameters: [
+          { name: "$table_name", type: "string", description: "Имя таблицы", required: true },
+          { name: "$use_cache", type: "bool", description: "Использовать кэш", default: "true" }
+        ],
+        return_type: "array",
+        example: `$fields = $this->cms_core->db->getTableFields('my_items');`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsPaginator — пагинация
+  // system/core/paginator.php
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsPaginator",
+    class: "cmsPaginator",
+    description: "Генерация HTML пагинации. Создаёт массив страниц и URL для навигации.",
+    access: "new cmsPaginator($total, $perpage, $current_page, $base_uri, $query = [])",
+    methods: [
+      {
+        name: "setMaxPagesToShow",
+        signature: "setMaxPagesToShow(int $max_show_pages): cmsPaginator",
+        description: "Максимальное количество видимых страниц",
+        parameters: [
+          { name: "$max_show_pages", type: "int", description: "Количество страниц", required: true }
+        ],
+        return_type: "cmsPaginator",
+        example: `$paginator = new cmsPaginator($total, 20, $page, $base_url)->setMaxPagesToShow(7);`
+      },
+      {
+        name: "setPageParamName",
+        signature: "setPageParamName(string $page_param_name): cmsPaginator",
+        description: "Имя GET параметра номера страницы",
+        parameters: [
+          { name: "$page_param_name", type: "string", description: "Имя параметра", default: "'page'" }
+        ],
+        return_type: "cmsPaginator",
+        example: `->setPageParamName('page_num')`
+      },
+      {
+        name: "getRendered",
+        signature: "getRendered(): string",
+        description: "Возвращает готовый HTML пагинации",
+        parameters: [],
+        return_type: "string",
+        example: `<?= $paginator->getRendered() ?>`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsResponse — HTTP ответ
+  // system/core/response.php
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsResponse",
+    class: "cmsResponse",
+    description: "Управление HTTP ответом: заголовки, body, отправка файлов, JSON.",
+    access: "$this->cms_core->response — в контроллере. cmsResponse::getInstance() — глобально.",
+    methods: [
+      {
+        name: "setContent",
+        signature: "setContent(array|string $content): cmsResponse",
+        description: "Устанавливает тело ответа",
+        parameters: [
+          { name: "$content", type: "array|string", description: "HTML или массив для JSON", required: true }
+        ],
+        return_type: "cmsResponse",
+        example: `$this->cms_core->response->setContent('<h1>Hello</h1>');`
+      },
+      {
+        name: "setStatusCode",
+        signature: "setStatusCode(int $status_code): cmsResponse",
+        description: "Устанавливает HTTP статус-код",
+        parameters: [
+          { name: "$status_code", type: "int", description: "Код (200, 404, 403 и т.д.)", required: true }
+        ],
+        return_type: "cmsResponse",
+        example: `$this->cms_core->response->setStatusCode(403);`
+      },
+      {
+        name: "setHeader",
+        signature: "setHeader(string $name, string $value): cmsResponse",
+        description: "Добавляет HTTP заголовок",
+        parameters: [
+          { name: "$name", type: "string", description: "Имя заголовка", required: true },
+          { name: "$value", type: "string", description: "Значение", required: true }
+        ],
+        return_type: "cmsResponse",
+        example: `$this->cms_core->response->setHeader('X-Custom-Header', 'value');`
+      },
+      {
+        name: "send",
+        signature: "send(bool $exit = true): void",
+        description: "Отправляет заголовки и контент, завершает выполнение",
+        parameters: [
+          { name: "$exit", type: "bool", description: "Вызывать exit()", default: "true" }
+        ],
+        return_type: "void",
+        example: `$this->cms_core->response->send();`
+      },
+      {
+        name: "sendFile",
+        signature: "sendFile(string $file_path, array $headers = []): void",
+        description: "Отправляет файл как HTTP ответ",
+        parameters: [
+          { name: "$file_path", type: "string", description: "Путь к файлу", required: true },
+          { name: "$headers", type: "array", description: "Дополнительные заголовки", default: "[]" }
+        ],
+        return_type: "void",
+        example: `$this->cms_core->response->sendFile($file_path, [
+    'Content-Disposition' => 'attachment; filename="file.pdf"'
+]);`
+      },
+      {
+        name: "sendAndExit",
+        signature: "sendAndExit(): void",
+        description: "Отправляет ответ и завершает выполнение",
+        parameters: [],
+        return_type: "void",
+        example: `$this->cms_core->response->sendAndExit();`
+      },
+      {
+        name: "getNonce",
+        signature: "getNonce(): string",
+        description: "Возвращает nonce для CSP (генерируется один раз)",
+        parameters: [],
+        return_type: "string",
+        example: `$nonce = cmsResponse::getNonce();
+// Использовать в inline-скриптах: <script nonce="<?= $nonce ?>">`
+      },
+      {
+        name: "renderJSON",
+        signature: "renderJSON(array $data): void",
+        description: "Отправляет JSON ответ и завершает выполнение",
+        parameters: [
+          { name: "$data", type: "array", description: "Данные для JSON", required: true }
+        ],
+        return_type: "void",
+        example: `$this->cms_core->response->renderJSON(['success' => true, 'id' => $id]);`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsImages — работа с изображениями
+  // system/core/images.php
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsImages",
+    class: "cmsImages",
+    description: "Класс для работы с изображениями: ресайз, водяные знаки, превью, конвертация.",
+    access: "cmsImages::getInstance() — глобально. cmsCore::getInstance()->images",
+    methods: [
+      {
+        name: "resize",
+        signature: "resize(string $source_file, string $dest_file, int $width, int $height, bool $is_update_exif = true): bool",
+        description: "Изменяет размер изображения",
+        parameters: [
+          { name: "$source_file", type: "string", description: "Исходный файл", required: true },
+          { name: "$dest_file", type: "string", description: "Результат", required: true },
+          { name: "$width", type: "int", description: "Новая ширина", required: true },
+          { name: "$height", type: "int", description: "Новая высота", required: true },
+          { name: "$is_update_exif", type: "bool", description: "Обновить EXIF", default: "true" }
+        ],
+        return_type: "bool",
+        example: `cmsImages::getInstance()->resize($src, $dst, 800, 600);`
+      },
+      {
+        name: "getHandledFilePath",
+        signature: "getHandledFilePath(string $file_path, string $preset_name): string",
+        description: "Возвращает путь к пресету изображения (автоматически создаёт превью)",
+        parameters: [
+          { name: "$file_path", type: "string", description: "Путь к оригиналу", required: true },
+          { name: "$preset_name", type: "string", description: "Имя пресета", required: true }
+        ],
+        return_type: "string",
+        example: `$thumb_path = cmsImages::getInstance()->getHandledFilePath($img, 'small');`
+      },
+      {
+        name: "isImageFile",
+        signature: "isImageFile(string $file_path): bool",
+        description: "Проверяет, является ли файл изображением",
+        parameters: [
+          { name: "$file_path", type: "string", description: "Путь к файлу", required: true }
+        ],
+        return_type: "bool",
+        example: `if (cmsImages::getInstance()->isImageFile($path)) {
+    // это изображение
+}`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsMailer — отправка email
+  // system/core/mailer.php
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsMailer",
+    class: "cmsMailer",
+    description: "Отправка email. Поддерживает SMTP, шаблоны писем, вложения.",
+    access: "cmsCore::getInstance()->mailer — в контроллере. new cmsMailer()",
+    methods: [
+      {
+        name: "send",
+        signature: "send(array $letter): bool",
+        description: "Отправляет письмо. letter = [to, from, from_name, subject, body, attachments, is_html]",
+        parameters: [
+          { name: "$letter", type: "array", description: "Массив данных письма", required: true }
+        ],
+        return_type: "bool",
+        example: `return cmsCore::getInstance()->mailer->send([
+    'to'      => $email,
+    'subject' => 'Подтверждение регистрации',
+    'body'    => $html_content,
+    'is_html' => true
+]);`
+      },
+      {
+        name: "addLetter",
+        signature: "addLetter(array $letter): cmsMailer",
+        description: "Добавляет письмо в очередь на отправку",
+        parameters: [
+          { name: "$letter", type: "array", description: "Массив письма", required: true }
+        ],
+        return_type: "cmsMailer",
+        example: `cmsCore::getInstance()->mailer->addLetter([
+    'to'      => $email,
+    'subject' => 'Привет!',
+    'body'    => 'Добро пожаловать на сайт!'
+]);`
+      },
+      {
+        name: "queueSending",
+        signature: "queueSending(): void",
+        description: "Отправляет все письма из очереди",
+        parameters: [],
+        return_type: "void",
+        example: `cmsCore::getInstance()->mailer->queueSending();`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsGrid — рендеринг гридов
+  // system/core/grid.php
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsGrid",
+    class: "cmsGrid",
+    description: "Класс для рендеринга табличных данных (используется в бэкенде для списков).",
+    access: "new cmsGrid($options) — создание грида в бэкенде",
+    methods: [
+      {
+        name: "setColumns",
+        signature: "setColumns(array $columns): cmsGrid",
+        description: "Устанавливает колонки грида",
+        parameters: [
+          { name: "$columns", type: "array", description: "Массив колонок", required: true }
+        ],
+        return_type: "cmsGrid",
+        example: `$grid = new cmsGrid($options);
+$grid->setColumns(['id', 'title', 'date_pub']);`
+      },
+      {
+        name: "render",
+        signature: "render(array $rows): string",
+        description: "Рендерит грид с данными, возвращает HTML",
+        parameters: [
+          { name: "$rows", type: "array", description: "Массив строк данных", required: true }
+        ],
+        return_type: "string",
+        example: `$html = $grid->render($items);`
+      },
+      {
+        name: "makeDataItem",
+        signature: "makeDataItem(array $item): array",
+        description: "Обрабатывает одну строку данных (фильтры, преобразования)",
+        parameters: [
+          { name: "$item", type: "array", description: "Строка данных", required: true }
+        ],
+        return_type: "array",
+        example: `$item = $grid->makeDataItem($row);`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsFormField — базовый класс полей формы
+  // system/core/formfield.php
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsFormField",
+    class: "cmsFormField",
+    description: "Базовый класс для всех типов полей форм. Поля используются в cmsForm.",
+    access: "Используется автоматически cmsForm при рендеринге",
+    methods: [
+      {
+        name: "getOptions",
+        signature: "getOptions(): array",
+        description: "Возвращает настройки поля",
+        parameters: [],
+        return_type: "array",
+        example: `$opts = $form_field->getOptions();`
+      },
+      {
+        name: "parse",
+        signature: "parse(array $data): mixed",
+        description: "Парсит значение поля из данных формы",
+        parameters: [
+          { name: "$data", type: "array", description: "POST/GET данные", required: true }
+        ],
+        return_type: "mixed",
+        example: `$value = $field->parse($this->request->data('post'));`
+      },
+      {
+        name: "store",
+        signature: "store(mixed $value, cmsModel $model): mixed",
+        description: "Сохраняет значение поля в БД",
+        parameters: [
+          { name: "$value", type: "mixed", description: "Значение", required: true },
+          { name: "$model", type: "cmsModel", description: "Модель", required: true }
+        ],
+        return_type: "mixed",
+        example: `$stored_value = $field->store($value, $this->model);`
+      },
+      {
+        name: "getInput",
+        signature: "getInput(mixed $value): string",
+        description: "Возвращает HTML input для поля",
+        parameters: [
+          { name: "$value", type: "mixed", description: "Текущее значение", required: true }
+        ],
+        return_type: "string",
+        example: `echo $field->getInput($item['field_value']);`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsRequest — HTTP запрос (дополнение)
+  // system/core/request.php
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsRequest (доп.)",
+    class: "cmsRequest",
+    description: "Дополнительные методы cmsRequest: работа с заголовками, IP, проверки типа устройства",
+    access: "$this->request — в контроллере",
+    methods: [
+      {
+        name: "getClientIp",
+        signature: "getClientIp(bool $safe = true): string",
+        description: "Получить IP адрес клиента (с учётом прокси)",
+        parameters: [
+          { name: "$safe", type: "bool", description: "Безопасный режим (не доверяет X-Forwarded)", default: "true" }
+        ],
+        return_type: "string",
+        example: `$ip = $this->request->getClientIp();`
+      },
+      {
+        name: "isMobile",
+        signature: "isMobile(): bool",
+        description: "Проверяет, мобильное ли устройство",
+        parameters: [],
+        return_type: "bool",
+        example: `if ($this->request->isMobile()) {
+    // мобильная версия
+}`
+      },
+      {
+        name: "isSecure",
+        signature: "isSecure(): bool",
+        description: "Проверяет HTTPS соединение",
+        parameters: [],
+        return_type: "bool",
+        example: `if (!$this->request->isSecure()) {
+    $this->redirect('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
+}`
+      },
+      {
+        name: "getUserAgent",
+        signature: "getUserAgent(): string",
+        description: "Возвращает User-Agent браузера",
+        parameters: [],
+        return_type: "string",
+        example: `$ua = $this->request->getUserAgent();`
+      },
+      {
+        name: "hasHeader",
+        signature: "hasHeader(string $name): bool",
+        description: "Проверяет наличие HTTP заголовка",
+        parameters: [
+          { name: "$name", type: "string", description: "Имя заголовка", required: true }
+        ],
+        return_type: "bool",
+        example: `if ($this->request->hasHeader('X-Requested-With')) {
+    // AJAX
+}`
+      },
+      {
+        name: "getHeader",
+        signature: "getHeader(string $name, mixed $default = null): mixed",
+        description: "Получить значение HTTP заголовка",
+        parameters: [
+          { name: "$name", type: "string", description: "Имя заголовка", required: true },
+          { name: "$default", type: "mixed", description: "Значение по умолчанию", required: false }
+        ],
+        return_type: "mixed",
+        example: `$token = $this->request->getHeader('Authorization');`
+      }
+    ]
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cmsConfig (доп.) — расширенные методы
+  // system/core/config.php
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    name: "cmsConfig (доп.)",
+    class: "cmsConfig",
+    description: "Дополнительные методы cmsConfig: пути, константы, управление конфигом",
+    access: "cmsConfig::getInstance() — глобально. cmsConfig::get('key') — статический доступ",
+    methods: [
+      {
+        name: "get",
+        signature: "get(string $key, mixed $default = null): mixed",
+        description: "Получить значение конфига (статический шорткат)",
+        parameters: [
+          { name: "$key", type: "string", description: "Ключ конфига", required: true },
+          { name: "$default", type: "mixed", description: "Значение по умолчанию", required: false }
+        ],
+        return_type: "mixed",
+        example: `$template = cmsConfig::get('template', 'default');
+$db_prefix = cmsConfig::get('db_prefix');`
+      },
+      {
+        name: "getAll",
+        signature: "getAll(): array",
+        description: "Возвращает все конфигурационные настройки",
+        parameters: [],
+        return_type: "array",
+        example: `$config = cmsConfig::getInstance()->getAll();`
+      },
+      {
+        name: "getControllersMapping",
+        signature: "getControllersMapping(): array",
+        description: "Возвращает маппинг контроллеров (для ремапа URL)",
+        parameters: [],
+        return_type: "array",
+        example: `$map = cmsConfig::getControllersMapping();`
+      },
+      {
+        name: "isReady",
+        signature: "isReady(): bool",
+        description: "Проверяет, загружена ли конфигурация",
+        parameters: [],
+        return_type: "bool",
+        example: `if (!cmsConfig::getInstance()->isReady()) {
+    // конфиг не загружен
+}`
+      },
+      {
+        name: "getUploadsPath",
+        signature: "getUploadsPath(): string",
+        description: "Возвращает абсолютный путь к папке загрузок",
+        parameters: [],
+        return_type: "string",
+        example: `$upload_path = cmsConfig::getInstance()->getUploadsPath();`
+      },
+      {
+        name: "getCachePath",
+        signature: "getCachePath(): string",
+        description: "Возвращает абсолютный путь к папке кэша",
+        parameters: [],
+        return_type: "string",
+        example: `$cache_path = cmsConfig::getInstance()->getCachePath();`
       }
     ]
   }

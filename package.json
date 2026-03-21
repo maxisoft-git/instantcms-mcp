@@ -10,16 +10,37 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "inspector": "npx @modelcontextprotocol/inspector tsx src/index.ts"
+    "inspector": "npx @modelcontextprotocol/inspector tsx src/index.ts",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "parse:database": "tsx src/tools/parser/sql-parser.ts",
+    "parse:events": "tsx src/tools/parser/events-parser.ts",
+    "parse:controllers": "tsx src/tools/parser/controllers-parser.ts",
+    "parse:widgets": "tsx src/tools/parser/widgets-parser.ts",
+    "parse:traits": "tsx src/tools/parser/traits-parser.ts",
+    "parse:fields": "tsx src/tools/parser/fields-parser.ts",
+    "parse:core": "tsx src/tools/parser/core-parser.ts",
+    "parse:all": "npm run parse:database && npm run parse:events && npm run parse:controllers && npm run parse:widgets && npm run parse:traits && npm run parse:fields && npm run parse:core && tsx src/tools/parser/coverage-generator.ts",
+    "coverage": "tsx src/tools/parser/coverage-generator.ts"
   },
-  "keywords": ["mcp", "instantcms", "cms"],
+  "keywords": [
+    "mcp",
+    "instantcms",
+    "cms"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@types/node": "^25.3.3",
+    "mysql2": "^3.20.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.6"
   }
 }

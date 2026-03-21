@@ -9,11 +9,16 @@ MCP (Model Context Protocol) сервер для разработки допол
 ## Возможности
 
 - **102 хука** с описанием параметров, типов и готовыми примерами реализации
-- **Генерация скаффолда** — все файлы дополнения за один вызов (manifest, install, model, frontend, actions, backend, widgets, routes)
-- **API классов** — cmsModel, cmsTemplate, cmsRequest, cmsCache, cmsEventsManager и другие
-- **Валидация** — проверка структуры дополнения на корректность
-- **Поиск хуков** — по имени, описанию, категории, параметрам
-- **Примеры кода** — паттерны для типовых задач (пагинация, AJAX, кэш, формы)
+- **170 событий** из таблицы cms_events
+- **38 классов ядра** (cmsModel, cmsTemplate, cmsDatabase и др.) с 500+ методами
+- **Генерация скаффолда** — все файлы дополнения за один вызов
+- **50 таблиц БД** с полными схемами
+- **61 контроллер** с 809 экшенами
+- **120 хелпер-функций** (template, html, files, strings)
+- **6 PHP классов** (Jevix, Google Auth, Mobile Detect, RSS, IDNA, YAML)
+- **Валидация структуры** дополнений
+- **Поиск хуков** по имени, описанию, категории
+- **Примеры кода** для типовых задач
 
 ---
 
@@ -73,22 +78,78 @@ npm run inspector
 
 ---
 
-## Инструменты
+## Инструменты (38)
 
+### Базовые (14)
 | Tool | Описание |
-|------|----------|
+|------|---------|
 | `get_addon_structure` | Структура файлов дополнения (5 типов) |
 | `scaffold_addon` | Генерация готового кода всех файлов |
-| `list_hooks` | Список хуков с фильтрацией по категории/типу |
+| `list_hooks` | Список хуков с фильтрацией |
 | `get_hook_details` | Детали хука + пример реализации |
 | `search_hooks` | Полнотекстовый поиск хуков |
 | `get_component_api` | API класса (cmsModel, cmsTemplate и др.) |
 | `list_components` | Список всех компонентов |
 | `validate_addon` | Валидация структуры дополнения |
-| `get_field_types` | Типы полей форм (14 типов) |
+| `get_field_types` | Типы полей форм |
 | `get_code_example` | Примеры кода для типовых задач |
 | `scaffold_template` | Генерация шаблона темы |
 | `get_template_structure` | Структура и переменные шаблона |
+| `scaffold_layout_scheme` | Схема виджетов для modern |
+| `list_layout_presets` | Пресеты схем |
+
+### База данных — статика (6)
+| Tool | Описание |
+|------|---------|
+| `introspect_database` | Список таблиц БД |
+| `describe_table` | Структура таблицы |
+| `list_content_types` | Типы контента |
+| `list_database_events` | Карта событий |
+| `analyze_controller` | Анализ контроллера |
+| `list_controllers` | Список контроллеров |
+
+### MariaDB — динамика (6)
+| Tool | Описание |
+|------|---------|
+| `maria_execute_query` | SQL запрос |
+| `maria_list_tables` | Список таблиц |
+| `maria_describe_table` | Структура таблицы |
+| `maria_get_database_info` | Статистика БД |
+| `maria_search_tables` | Поиск таблиц |
+| `maria_get_table_data` | Данные с пагинацией |
+
+### Исходный код (6)
+| Tool | Описание |
+|------|---------|
+| `list_widgets` | Список виджетов |
+| `get_widget_info` | Детали виджета |
+| `list_traits` | Список трейтов |
+| `get_trait_info` | Методы трейта |
+| `list_field_types` | Типы полей |
+| `get_field_type_info` | Детали поля |
+
+### Миграции (2)
+| Tool | Описание |
+|------|---------|
+| `generate_migration` | Генерация SQL и install.php |
+| `get_field_suggestions` | Подсказки по полям |
+
+### AI анализ (2)
+| Tool | Описание |
+|------|---------|
+| `analyze_requirement` | AI анализ запроса |
+| `suggest_addon_structure` | Структура по типу |
+
+---
+
+## Ресурсы (4)
+
+| URI | Описание |
+|-----|---------|
+| `instantcms://hooks/all` | Все хуки (JSON) |
+| `instantcms://components/all` | Все компоненты (JSON) |
+| `instantcms://addon/types` | Типы дополнений (JSON) |
+| `instantcms://quickstart` | Краткое руководство (Markdown) |
 
 ---
 
@@ -129,48 +190,32 @@ npm run inspector
 ```
 src/
 ├── data/
-│   ├── hooks.ts        # 102 хука по 17 категориям
-│   ├── components.ts   # API базовых классов
-│   └── schemas.ts      # Структуры дополнений, типы полей
+│   ├── hooks.ts           # 102 хука по 17 категориям
+│   ├── components.ts     # API базовых классов
+│   ├── core-api.ts       # 38 классов ядра с методами
+│   ├── libs-api.ts       # Хелперы, классы, сторонние библиотеки
+│   ├── js-api.ts         # JavaScript API для фронтенда
+│   ├── database-schema.ts # 50 таблиц БД
+│   ├── events-map.ts     # 170 событий
+│   ├── controllers-map.ts # 61 контроллер, 809 экшенов
+│   ├── traits-map.ts      # 10 трейтов, 56 методов
+│   ├── fields-map.ts      # 32 типа полей
+│   ├── widgets-map.ts     # 4 виджета
+│   └── schemas.ts        # Структуры дополнений
 ├── tools/
-│   ├── hooks-tool.ts   # list / get / search хуков
-│   ├── addon-tool.ts   # структура, API, валидация, примеры
-│   └── scaffold-tool.ts # генерация файлов дополнений
-├── server.ts           # Регистрация tools и resources
-└── index.ts            # Точка входа (stdio transport)
+│   ├── hooks-tool.ts     # list / get / search хуков
+│   ├── addon-tool.ts     # структура, API, валидация
+│   ├── scaffold-tool.ts   # генерация файлов
+│   ├── layout-tool.ts    # схемы виджетов
+│   ├── db-tool.ts        # статические данные БД
+│   ├── controllers-tool.ts # контроллеры
+│   ├── source-tool.ts    # виджеты, трейты, поля
+│   ├── migration-tool.ts  # миграции
+│   ├── requirement-tool.ts # AI анализ
+│   └── parser/           # Парсеры данных
+├── server.ts             # 38 инструментов + 4 ресурса
+└── index.ts              # Точка входа
 ```
-
----
-
-## Структура генерируемого пакета
-
-`scaffold_addon` создаёт пакет в формате менеджера расширений InstantCMS:
-
-```
-[pkg] manifest.ru.ini            ← метаданные пакета
-[pkg] install.sql                ← SQL для создания таблиц
-package/
-  system/
-    controllers/{name}/
-      frontend.php               ← class {name} extends cmsFrontend
-      backend.php                ← class backend{Name} extends cmsBackend
-      model.php                  ← class model{Name} extends cmsModel
-      actions/
-        index.php                ← class action{Name}Index extends cmsAction
-        view.php                 ← class action{Name}View extends cmsAction
-      hooks/
-        {hook_name}.php          ← class on{Name}{Hook} extends cmsAction
-      backend/
-        forms/form_item.php
-        forms/form_options.php
-        grids/grid_items.php
-      widgets/list/
-        widget.php
-        options.form.php
-    languages/ru/controllers/{name}/{name}.php
-```
-
-**Установка**: упаковать в ZIP и загрузить через «Панель управления → Расширения».
 
 ---
 
@@ -178,58 +223,93 @@ package/
 
 | Тип | Описание |
 |-----|----------|
-| `basic` | Только фронтенд (список + просмотр) |
-| `with_admin` | Фронтенд + CRUD в административной панели |
-| `with_hooks` | Интеграция с другими компонентами через хуки |
+| `basic` | Только фронтенд |
+| `with_admin` | Фронтенд + CRUD в админке |
+| `with_hooks` | Интеграция через хуки |
 | `with_routes` | Кастомные URL-маршруты |
-| `with_widget` | Виджет для размещения на страницах |
+| `with_widget` | Виджет |
 
 ---
 
-## Категории хуков
+## Библиотеки (system/libs)
 
-| Категория | Кол-во | Описание |
-|-----------|--------|----------|
-| `content` | 24 | Материалы, типы контента, альбомы, фото |
-| `users` | 22 | Регистрация, профили, дружба, стена, сообщения |
-| `groups` | 8 | Группы сообщества |
-| `comments` | 9 | Комментарии |
-| `admin` | 5 | Административная панель |
-| `template` | 6 | Рендер страниц, меню, виджеты |
-| `activity` | 4 | Лента активности |
-| `engine` | 8 | Системные события, email, настройки |
-| `forms` | 3 | Формы |
-| `search` | 1 | Полнотекстовый поиск |
-| `sitemap` | 2 | XML-карта сайта |
-| `rss` | 1 | RSS-ленты |
-| `cron` | 3 | Планировщик задач |
-| `subscriptions` | 3 | Подписки |
-| `rating` | 2 | Рейтинг и голосование |
-| `moderation` | 1 | Очередь модерации |
-| `controllers` | 2 | Настройки контроллеров |
+### Хелпер-функции (120)
+
+| Модуль | Кол-во | Описание |
+|--------|--------|---------|
+| template.helper | 28 | HTML-шаблонизация |
+| html.helper | 30 | Экранирование, типографика |
+| files.helper | 19 | Файловые операции |
+| strings.helper | 43 | Строки, даты, URL, SEO |
+
+### PHP классы (6)
+
+| Класс | Назначение |
+|-------|------------|
+| Jevix | XSS-фильтрация, HTML/XML парсер |
+| googleAuthenticator | Google Authenticator 2FA |
+| Mobile_Detect | Определение мобильных устройств |
+| lastRSS | RSS парсер |
+| idna_convert | IDN Unicode/Punycode |
+| spyc | YAML парсер |
+
+### Сторонние (3)
+
+| Библиотека | Назначение |
+|------------|------------|
+| scssphp | Компилятор SCSS/SASS |
+| geshi | Подсветка синтаксиса |
+| phpmailer | Отправка email |
 
 ---
 
 ## Разработка
 
 ```bash
+# Установка зависимостей
+npm install
+
 # Режим наблюдения (hot reload)
 npm run dev
 
 # Пересборка
 npm run build
 
-# Запуск инспектора MCP
-npm run inspector
+# Тесты (71 тест)
+npm test
+
+# Парсинг данных
+npm run parse:all
 ```
 
 ---
 
 ## Совместимость
 
-- **InstantCMS**: 2.x (протестировано на 2.18.1)
+- **InstantCMS**: 2.x
 - **Node.js**: 18+
 - **MCP SDK**: @modelcontextprotocol/sdk ^1.0
+
+---
+
+## Статистика
+
+| Метрика | Значение |
+|---------|----------|
+| MCP инструментов | **38** |
+| MCP ресурсов | **4** |
+| Тестов | **71** |
+| SQL таблиц | **50** |
+| Хуков | **102** |
+| Событий | **170** |
+| Контроллеров | **61** |
+| Экшенов | **809** |
+| Классов ядра | **38** |
+| Виджетов | **4** |
+| Трейтов | **10** |
+| Типов полей | **32** |
+| Хелпер-функций | **120** |
+| PHP классов | **6** |
 
 ---
 

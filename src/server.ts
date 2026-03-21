@@ -12,6 +12,12 @@ import {
 } from "./tools/addon-tool.js";
 import { scaffoldAddon, scaffoldTemplate } from "./tools/scaffold-tool.js";
 import { scaffoldLayoutScheme, listLayoutPresets, layoutPresets } from "./tools/layout-tool.js";
+import { introspectDatabase, listContentTypes, listDatabaseEvents, describeTable } from "./tools/db-tool.js";
+import { analyzeController, listControllers, getControllerActionsList, listSystemTraits } from "./tools/controllers-tool.js";
+import { mariaExecuteQuery, mariaListTables, mariaDescribeTable, mariaGetDatabaseInfo, mariaSearchTables, mariaGetTableData } from "./tools/maria-tool.js";
+import { listWidgets, getWidgetInfo, listTraits, getTraitInfo, listFields, getFieldInfo } from "./tools/source-tool.js";
+import { generateMigration, generateFieldSuggestions } from "./tools/migration-tool.js";
+import { analyzeRequirement, suggestAddonStructure } from "./tools/requirement-tool.js";
 
 import { hooks, hookCategories } from "./data/hooks.js";
 import { components } from "./data/components.js";
@@ -378,6 +384,451 @@ export function createServer(): McpServer {
         content: [{
           type: "text",
           text: JSON.stringify(listLayoutPresets(), null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 15. Анализ структуры базы данных ──────────────────────────────────────
+  server.tool(
+    "introspect_database",
+    "Анализ структуры базы данных InstantCMS. Без параметров — список всех таблиц. С параметром table_name — детали конкретной таблицы.",
+    {
+      table_name: z.string().optional().describe("Имя таблицы (без префикса cms_). Пример: users, content_types, widgets")
+    },
+    async ({ table_name }) => {
+      const result = introspectDatabase(table_name);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 16. Описание конкретной таблицы ──────────────────────────────────────
+  server.tool(
+    "describe_table",
+    "Подробное описание таблицы: поля, индексы, связи, типы данных. Генерирует примеры SQL-запросов.",
+    {
+      table_name: z.string().describe("Имя таблицы (можно с префиксом cms_ или без). Пример: cms_users, content_types")
+    },
+    async ({ table_name }) => {
+      const result = describeTable(table_name);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 17. Типы контента ────────────────────────────────────────────────────
+  server.tool(
+    "list_content_types",
+    "Информация о типах контента: cms_content_types, cms_con_pages, cms_users. Поля, ключи, связи.",
+    {},
+    async () => {
+      const result = listContentTypes();
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 18. Карта событий (events) ────────────────────────────────────────────
+  server.tool(
+    "list_database_events",
+    "Все зарегистрированные события (хуки) из таблицы cms_events. Показывает какой контроллер на какое событие подписан.",
+    {},
+    async () => {
+      const result = listDatabaseEvents();
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 19. Анализ контроллера ───────────────────────────────────────────────
+  server.tool(
+    "analyze_controller",
+    "Подробная информация о контроллере: класс, наследование, экшены, трейты, файлы.",
+    {
+      name: z.string().describe("Имя контроллера. Пример: content, users, messages"),
+      type: z.enum(["frontend", "backend"]).optional().describe("Тип контроллера")
+    },
+    async ({ name, type }) => {
+      const result = analyzeController(name, type);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 20. Список контроллеров ──────────────────────────────────────────────
+  server.tool(
+    "list_controllers",
+    "Список всех контроллеров: frontend и backend. Можно фильтровать по типу.",
+    {
+      filter: z.enum(["frontend", "backend"]).optional().describe("Фильтр по типу контроллера")
+    },
+    async ({ filter }) => {
+      const result = listControllers(filter);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 21. Экшены контроллера ───────────────────────────────────────────────
+  server.tool(
+    "get_controller_actions",
+    "Список всех экшенов контроллера с параметрами, видимостью и трейтами.",
+    {
+      name: z.string().describe("Имя контроллера. Пример: content, users"),
+      type: z.enum(["frontend", "backend"]).optional().describe("Тип контроллера")
+    },
+    async ({ name, type }) => {
+      const result = getControllerActionsList(name, type);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 22. Системные трейты ─────────────────────────────────────────────────
+  server.tool(
+    "list_system_traits",
+    "Список всех системных трейтов icms используемых в контроллерах. Трейты предоставляют готовую функциональность.",
+    {},
+    async () => {
+      const result = listSystemTraits();
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARIADB TOOLS (Фаза 1: Работа с базой данных)
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  // Внимание: Для работы требуется настроить переменные окружения:
+  // DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_DATABASE
+
+  // ── 23. Выполнить SQL запрос ─────────────────────────────────────────────
+  server.tool(
+    "maria_execute_query",
+    "Выполняет произвольный SQL запрос к базе данных MariaDB. Возвращает результат с колонками, строками и временем выполнения.",
+    {
+      sql: z.string().describe("SQL запрос для выполнения. Пример: SELECT * FROM cms_users LIMIT 10")
+    },
+    async ({ sql }) => {
+      const result = await mariaExecuteQuery(sql);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 24. Список таблиц ────────────────────────────────────────────────────
+  server.tool(
+    "maria_list_tables",
+    "Возвращает список всех таблиц в текущей базе данных MariaDB.",
+    {},
+    async () => {
+      const result = await mariaListTables();
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 25. Описание таблицы ────────────────────────────────────────────────
+  server.tool(
+    "maria_describe_table",
+    "Подробное описание структуры таблицы: колонки, типы, индексы, количество строк.",
+    {
+      table_name: z.string().describe("Имя таблицы. Пример: cms_users, cms_content")
+    },
+    async ({ table_name }) => {
+      const result = await mariaDescribeTable(table_name);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 26. Информация о базе данных ─────────────────────────────────────────
+  server.tool(
+    "maria_get_database_info",
+    "Статистика базы данных: имя, количество таблиц, строк, размер.",
+    {},
+    async () => {
+      const result = await mariaGetDatabaseInfo();
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 27. Поиск таблиц ─────────────────────────────────────────────────────
+  server.tool(
+    "maria_search_tables",
+    "Поиск таблиц по имени. Полезно когда не помните точное имя таблицы.",
+    {
+      pattern: z.string().describe("Строка для поиска. Пример: users, content, widget")
+    },
+    async ({ pattern }) => {
+      const result = await mariaSearchTables(pattern);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 28. Данные из таблицы ───────────────────────────────────────────────
+  server.tool(
+    "maria_get_table_data",
+    "Получить данные из таблицы с поддержкой пагинации, сортировки и фильтрации.",
+    {
+      table_name: z.string().describe("Имя таблицы. Пример: cms_users"),
+      limit: z.number().optional().default(20).describe("Количество строк (по умолчанию 20)"),
+      offset: z.number().optional().default(0).describe("Смещение для пагинации"),
+      order_by: z.string().optional().default("id").describe("Поле для сортировки"),
+      order_dir: z.enum(["ASC", "DESC"]).optional().default("DESC").describe("Направление сортировки"),
+      filter: z.record(z.string(), z.unknown()).optional().describe("Фильтр в формате {поле: значение}")
+    },
+    async ({ table_name, limit, offset, order_by, order_dir, filter }) => {
+      const result = await mariaGetTableData(table_name, { limit, offset, orderBy: order_by, orderDir: order_dir, filter });
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SOURCE CODE TOOLS (Фаза 2: Виджеты, трейты, поля)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ── 29. Список виджетов ─────────────────────────────────────────────────
+  server.tool(
+    "list_widgets",
+    "Список всех доступных виджетов InstantCMS. Можно фильтровать по контроллеру.",
+    {
+      controller: z.string().optional().describe("Фильтр по контроллеру. Пример: content, users")
+    },
+    async ({ controller }) => {
+      const result = listWidgets(controller);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 30. Информация о виджете ────────────────────────────────────────────
+  server.tool(
+    "get_widget_info",
+    "Подробная информация о виджете: класс, файл, настройки.",
+    {
+      name: z.string().describe("Имя виджета. Пример: text, menu, html")
+    },
+    async ({ name }) => {
+      const result = getWidgetInfo(name);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 31. Список трейтов ─────────────────────────────────────────────────
+  server.tool(
+    "list_traits",
+    "Список всех системных трейтов. Можно фильтровать по namespace.",
+    {
+      namespace: z.string().optional().describe("Фильтр по namespace. Пример: services, controllers")
+    },
+    async ({ namespace }) => {
+      const result = listTraits(namespace);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 32. Информация о трейте ────────────────────────────────────────────
+  server.tool(
+    "get_trait_info",
+    "Подробная информация о трейте: методы, параметры, описание.",
+    {
+      name: z.string().describe("Имя трейта. Пример: fieldsParseable, listgrid")
+    },
+    async ({ name }) => {
+      const result = getTraitInfo(name);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 33. Список типов полей ─────────────────────────────────────────────
+  server.tool(
+    "list_field_types",
+    "Список всех типов полей для форм InstantCMS: string, text, image, list и др.",
+    {},
+    async () => {
+      const result = listFields();
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 34. Информация о поле ─────────────────────────────────────────────
+  server.tool(
+    "get_field_type_info",
+    "Подробная информация о типе поля: класс, опции, описание.",
+    {
+      name: z.string().describe("Имя типа поля. Пример: string, list, image, date")
+    },
+    async ({ name }) => {
+      const result = getFieldInfo(name);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 35. Генерация миграции ────────────────────────────────────────────
+  server.tool(
+    "generate_migration",
+    "Генерация SQL и PHP кода для создания таблицы. Генерирует install.php, SQL CREATE TABLE и соглашения по именованию.",
+    {
+      name: z.string().describe("Имя таблицы (без префикса cms_). Пример: my_items, catalog_products"),
+      fields: z.array(z.object({
+        name: z.string().describe("Имя поля"),
+        type: z.string().describe("Тип: varchar(255), text, int(11), datetime, tinyint(1), decimal(10,2)"),
+        nullable: z.boolean().optional().describe("Может быть NULL"),
+        default: z.string().optional().describe("Значение по умолчанию"),
+        comment: z.string().optional().describe("Комментарий к полю")
+      })).describe("Массив полей таблицы")
+    },
+    async ({ name, fields }) => {
+      const result = generateMigration(name, fields);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 36. Подсказки по полям ────────────────────────────────────────────
+  server.tool(
+    "get_field_suggestions",
+    "Подсказки по типичным полям для генерации миграций: string, text, number, datetime, user, bool.",
+    {
+      field_type: z.enum(["string", "text", "number", "datetime", "user", "bool"]).describe("Тип категории полей")
+    },
+    async ({ field_type }) => {
+      const result = generateFieldSuggestions(field_type);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 37. Анализ требований ──────────────────────────────────────────
+  server.tool(
+    "analyze_requirement",
+    "AI анализ запроса пользователя и предложение структуры дополнения. Определяет тип дополнения, необходимые хуки, таблицы, контроллеры.",
+    {
+      requirement: z.string().describe("Описание задачи. Пример: 'каталог товаров с корзиной', 'блог с комментариями', 'RSS лента новостей'")
+    },
+    async ({ requirement }) => {
+      const result = analyzeRequirement(requirement);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 38. Структура по типу ─────────────────────────────────────────
+  server.tool(
+    "suggest_addon_structure",
+    "Предложить структуру файлов для типа дополнения (basic, with_admin, with_hooks, with_routes, with_widget).",
+    {
+      type: z.enum(["basic", "with_admin", "with_hooks", "with_routes", "with_widget"]).describe("Тип дополнения")
+    },
+    async ({ type }) => {
+      const result = suggestAddonStructure(type);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
         }]
       };
     }
