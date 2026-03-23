@@ -33,6 +33,5 @@ yarn-error.log*
 
 # npm
 .npm
-package-lock.json
 
 source/
