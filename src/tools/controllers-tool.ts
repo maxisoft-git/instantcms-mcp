@@ -1,27 +1,27 @@
-import { controllersMap, getController, getControllerActions, getControllersWithBackend, getBackendControllers } from "../data/controllers-map.js";
+import { controllersMap, getController } from '../data/controllers-map.js';
 
 export function analyzeController(name: string, type?: 'frontend' | 'backend'): object {
   const controller = getController(name, type);
-  
+
   if (!controller) {
     const suggestions = controllersMap.controllers
       .filter(c => c.name.includes(name.toLowerCase()))
       .slice(0, 5)
       .map(c => ({ name: c.name, type: c.type }));
-    
+
     return {
       error: `Контроллер "${name}" не найден`,
-      suggestions
+      suggestions,
     };
   }
-  
+
   const traits = new Set<string>();
   for (const action of controller.actions) {
     for (const trait of action.traits) {
       traits.add(trait);
     }
   }
-  
+
   return {
     name: controller.name,
     className: controller.className,
@@ -36,40 +36,40 @@ export function analyzeController(name: string, type?: 'frontend' | 'backend'): 
         filePath: a.filePath,
         hasParams: a.hasParams,
         params: a.params,
-        visibility: a.visibility
-      }))
+        visibility: a.visibility,
+      })),
     },
     traits: Array.from(traits),
     hasBackendFolder: controller.hasBackendFolder,
     hasModel: controller.hasModel,
-    modelFile: controller.modelFile
+    modelFile: controller.modelFile,
   };
 }
 
 export function listControllers(filter?: string): object {
   let controllers = controllersMap.controllers;
-  
+
   if (filter === 'frontend') {
     controllers = controllers.filter(c => c.type === 'frontend');
   } else if (filter === 'backend') {
     controllers = controllers.filter(c => c.type === 'backend');
   }
-  
+
   const byType: Record<string, object[]> = {
     frontend: [],
-    backend: []
+    backend: [],
   };
-  
+
   for (const ctrl of controllers) {
     byType[ctrl.type].push({
       name: ctrl.name,
       className: ctrl.className,
       actionsCount: ctrl.actions.length,
       hasBackend: ctrl.hasBackendFolder,
-      hasModel: ctrl.hasModel
+      hasModel: ctrl.hasModel,
     });
   }
-  
+
   return {
     total: controllers.length,
     byType,
@@ -79,18 +79,18 @@ export function listControllers(filter?: string): object {
       extends: c.extends,
       actionsCount: c.actions.length,
       hasBackendFolder: c.hasBackendFolder,
-      hasModel: c.hasModel
-    }))
+      hasModel: c.hasModel,
+    })),
   };
 }
 
 export function getControllerActionsList(name: string, type?: 'frontend' | 'backend'): object {
   const controller = getController(name, type);
-  
+
   if (!controller) {
     return { error: `Контроллер "${name}" не найден` };
   }
-  
+
   return {
     controller: controller.name,
     type: controller.type,
@@ -101,21 +101,21 @@ export function getControllerActionsList(name: string, type?: 'frontend' | 'back
       visibility: a.visibility,
       hasParams: a.hasParams,
       params: a.params,
-      traits: a.traits
-    }))
+      traits: a.traits,
+    })),
   };
 }
 
 export function listSystemTraits(): object {
   const allTraits: Record<string, Set<string>> = {};
-  
+
   for (const controller of controllersMap.controllers) {
     for (const action of controller.actions) {
       for (const trait of action.traits) {
         const parts = trait.split('\\');
         const namespace = parts.slice(0, -1).join('\\');
         const traitName = parts[parts.length - 1];
-        
+
         if (!allTraits[namespace]) {
           allTraits[namespace] = new Set();
         }
@@ -123,14 +123,14 @@ export function listSystemTraits(): object {
       }
     }
   }
-  
+
   const result: Record<string, string[]> = {};
   for (const [ns, traits] of Object.entries(allTraits)) {
     result[ns] = Array.from(traits).sort();
   }
-  
+
   return {
     namespaces: Object.keys(result).length,
-    traits: result
+    traits: result,
   };
 }

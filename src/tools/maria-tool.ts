@@ -1,24 +1,24 @@
-import { executeQuery, getTableInfo, listTables, getDatabaseInfo, describeTable, showIndexes } from "./mariadb.js";
+import { executeQuery, getTableInfo, listTables, getDatabaseInfo, showIndexes } from './mariadb.js';
 
 export async function mariaExecuteQuery(sql: string): Promise<object> {
   const result = await executeQuery(sql);
-  
+
   if (result.error) {
     return {
       success: false,
       error: result.error,
       query: result.query,
-      executionTime: result.executionTime
+      executionTime: result.executionTime,
     };
   }
-  
+
   return {
     success: true,
     columns: result.columns,
     rows: result.rows,
     rowCount: result.rowCount,
     query: result.query,
-    executionTime: result.executionTime
+    executionTime: result.executionTime,
   };
 }
 
@@ -26,19 +26,19 @@ export async function mariaListTables(): Promise<object> {
   const tables = await listTables();
   return {
     tables,
-    count: tables.length
+    count: tables.length,
   };
 }
 
 export async function mariaDescribeTable(tableName: string): Promise<object> {
   const info = await getTableInfo(tableName);
-  
+
   if (!info) {
     return {
-      error: `Table "${tableName}" not found`
+      error: `Table "${tableName}" not found`,
     };
   }
-  
+
   return {
     name: info.name,
     comment: info.comment,
@@ -50,14 +50,14 @@ export async function mariaDescribeTable(tableName: string): Promise<object> {
       key: c.key,
       default: c.default,
       extra: c.extra,
-      comment: c.comment
+      comment: c.comment,
     })),
     indexes: info.indexes.map(i => ({
       name: i.name,
       type: i.type,
       columns: i.columns,
-      unique: i.unique
-    }))
+      unique: i.unique,
+    })),
   };
 }
 
@@ -72,29 +72,27 @@ export async function mariaShowIndexes(tableName: string): Promise<object> {
     indexes: result.rows,
     columnCount: result.columns.length,
     executionTime: result.executionTime,
-    error: result.error
+    error: result.error,
   };
 }
 
 export async function mariaSearchTables(pattern: string): Promise<object> {
   const tables = await listTables();
-  const matching = tables.filter(t => 
-    t.toLowerCase().includes(pattern.toLowerCase())
-  );
-  
+  const matching = tables.filter(t => t.toLowerCase().includes(pattern.toLowerCase()));
+
   return {
     pattern,
     matched: matching,
-    count: matching.length
+    count: matching.length,
   };
 }
 
 export async function mariaGetTableData(
-  tableName: string, 
-  options?: { 
-    limit?: number; 
-    offset?: number; 
-    orderBy?: string; 
+  tableName: string,
+  options?: {
+    limit?: number;
+    offset?: number;
+    orderBy?: string;
     orderDir?: 'ASC' | 'DESC';
     filter?: Record<string, unknown>;
   }
@@ -103,10 +101,10 @@ export async function mariaGetTableData(
   const offset = options?.offset || 0;
   const orderBy = options?.orderBy || 'id';
   const orderDir = options?.orderDir || 'DESC';
-  
+
   let sql = `SELECT * FROM \`${tableName}\``;
   const params: unknown[] = [];
-  
+
   if (options?.filter) {
     const filterConditions: string[] = [];
     for (const [key, value] of Object.entries(options.filter)) {
@@ -117,19 +115,19 @@ export async function mariaGetTableData(
       sql += ` WHERE ${filterConditions.join(' AND ')}`;
     }
   }
-  
+
   sql += ` ORDER BY \`${orderBy}\` ${orderDir} LIMIT ? OFFSET ?`;
   params.push(limit, offset);
-  
+
   const result = await executeQuery(sql);
-  
+
   if (result.error) {
     return {
       error: result.error,
-      query: result.query
+      query: result.query,
     };
   }
-  
+
   return {
     table: tableName,
     columns: result.columns,
@@ -139,9 +137,9 @@ export async function mariaGetTableData(
       limit,
       offset,
       orderBy,
-      orderDir
+      orderDir,
     },
     query: result.query,
-    executionTime: result.executionTime
+    executionTime: result.executionTime,
   };
 }

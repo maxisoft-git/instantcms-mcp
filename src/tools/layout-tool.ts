@@ -92,7 +92,8 @@ export interface LayoutSchemeInput {
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function yamlNull(): string {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _yamlNull(): string {
   return 'null';
 }
 
@@ -117,7 +118,10 @@ function yamlJsonOpts(obj: Record<string, unknown>): string {
 
 /** YAML literal block scalar for multiline strings (wrapper field) */
 function yamlLiteral(s: string, indent: string): string {
-  const lines = s.split('\n').map(l => `${indent}    ${l}`).join('\n');
+  const lines = s
+    .split('\n')
+    .map(l => `${indent}    ${l}`)
+    .join('\n');
   return `|\n${lines}`;
 }
 
@@ -188,7 +192,7 @@ export function scaffoldLayoutScheme(opts: LayoutSchemeInput): LayoutSchemeResul
         rowId,
         def: colDef,
         ordering: colOrder,
-        position
+        position,
       };
       colMetas.push(cm);
       positionToCol.set(position, cm);
@@ -229,7 +233,7 @@ export function scaffoldLayoutScheme(opts: LayoutSchemeInput): LayoutSchemeResul
       container_tag: rd.container_tag || 'div',
       container_tag_class: rd.container_class || '',
       parrent_tag: rd.outer_tag || '',
-      parrent_tag_class: rd.outer_class || ''
+      parrent_tag_class: rd.outer_class || '',
     };
 
     // row tag
@@ -243,7 +247,9 @@ export function scaffoldLayoutScheme(opts: LayoutSchemeInput): LayoutSchemeResul
     lines.push(`${indent(3)}tag: ${rowTag === null ? 'null' : yamlBare(String(rowTag))}`);
     lines.push(`${indent(3)}template: ${yamlBare(template)}`);
     lines.push(`${indent(3)}ordering: ${yamlQ(rm.ordering)}`);
-    lines.push(`${indent(3)}nested_position: ${rd.parent_col ? yamlBare(rd.nested_position || 'after') : 'null'}`);
+    lines.push(
+      `${indent(3)}nested_position: ${rd.parent_col ? yamlBare(rd.nested_position || 'after') : 'null'}`
+    );
     const rowClass = rd.class !== undefined ? rd.class : null;
     lines.push(`${indent(3)}class: ${rowClass === null ? 'null' : yamlBare(rowClass)}`);
     lines.push(`${indent(3)}options: ${yamlJsonOpts(rowOptions)}`);
@@ -269,7 +275,7 @@ export function scaffoldLayoutScheme(opts: LayoutSchemeInput): LayoutSchemeResul
         sm_order: cd.sm_order || 0,
         md_order: cd.md_order || 0,
         lg_order: cd.lg_order || 0,
-        xl_order: cd.xl_order || 0
+        xl_order: cd.xl_order || 0,
       };
 
       lines.push(`${indent(2)}${cm.id}:`);
@@ -352,9 +358,9 @@ nested_position: "after" — после виджетов позиции.
       rows_count: rowMetas.length,
       cols_count: rowMetas.reduce((n, r) => n + r.cols.length, 0),
       positions: allPositions,
-      notes
+      notes,
     },
-    usage_notes: usageNotes
+    usage_notes: usageNotes,
   };
 }
 
@@ -378,9 +384,9 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               title: 'Шапка',
               position: 'pos_header',
               tag: 'div',
-              col: 'col-sm-12'
-            }
-          ]
+              col: 'col-sm-12',
+            },
+          ],
         },
         {
           title: 'Контент',
@@ -393,16 +399,16 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               position: 'pos_content',
               tag: 'article',
               class: 'mb-3 mb-md-4',
-              col_lg: 'col-lg'
+              col_lg: 'col-lg',
             },
             {
               title: 'Правая колонка',
               position: 'pos_sidebar_right',
               tag: 'aside',
               class: 'mb-3 mb-md-4',
-              col_lg: 'col-lg-4'
-            }
-          ]
+              col_lg: 'col-lg-4',
+            },
+          ],
         },
         {
           title: 'Футер',
@@ -415,12 +421,12 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               title: 'Футер',
               position: 'pos_footer',
               tag: 'div',
-              col: 'col-sm-12'
-            }
-          ]
-        }
-      ]
-    }
+              col: 'col-sm-12',
+            },
+          ],
+        },
+      ],
+    },
   },
 
   with_sidebar_left: {
@@ -432,9 +438,7 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
           title: 'Шапка',
           outer_tag: 'header',
           container: 'container',
-          cols: [
-            { title: 'Шапка', position: 'pos_header', tag: 'div', col: 'col-sm-12' }
-          ]
+          cols: [{ title: 'Шапка', position: 'pos_header', tag: 'div', col: 'col-sm-12' }],
         },
         {
           title: 'Контент',
@@ -447,7 +451,7 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               tag: 'aside',
               class: 'mb-3 mb-md-4',
               col_lg: 'col-lg-3',
-              order: 1
+              order: 1,
             },
             {
               title: 'Тело страницы',
@@ -455,7 +459,7 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               tag: 'article',
               class: 'mb-3 mb-md-4',
               col_lg: 'col-lg',
-              order: 2
+              order: 2,
             },
             {
               title: 'Правая колонка',
@@ -463,9 +467,9 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               tag: 'aside',
               class: 'mb-3 mb-md-4',
               col_lg: 'col-lg-4',
-              order: 3
-            }
-          ]
+              order: 3,
+            },
+          ],
         },
         {
           title: 'Футер',
@@ -477,22 +481,23 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               title: 'Футер левый',
               position: 'pos_footer_left',
               tag: 'div',
-              col_md: 'col-md-6'
+              col_md: 'col-md-6',
             },
             {
               title: 'Футер правый',
               position: 'pos_footer_right',
               tag: 'div',
-              col_md: 'col-md-6'
-            }
-          ]
-        }
-      ]
-    }
+              col_md: 'col-md-6',
+            },
+          ],
+        },
+      ],
+    },
   },
 
   modern_full: {
-    description: 'Полная схема modern: хедер (топ бар + лого/меню + навбар), блок-баннер, контент (лево/тело/право), перед футером, футер',
+    description:
+      'Полная схема modern: хедер (топ бар + лого/меню + навбар), блок-баннер, контент (лево/тело/право), перед футером, футер',
     scheme: {
       template: 'modern',
       rows: [
@@ -507,9 +512,10 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               position: 'pos_header_top',
               tag: 'div',
               type: 'custom',
-              wrapper: '<div class="icms-header__top">\n    <div class="container d-flex justify-content-end flex-nowrap align-items-center">\n        {position}\n    </div>\n</div>'
-            }
-          ]
+              wrapper:
+                '<div class="icms-header__top">\n    <div class="container d-flex justify-content-end flex-nowrap align-items-center">\n        {position}\n    </div>\n</div>',
+            },
+          ],
         },
         {
           title: 'Лого и меню пользователя',
@@ -526,16 +532,16 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               tag: 'div',
               type: 'custom',
               wrapper: '{position}',
-              col: 'col'
+              col: 'col',
             },
             {
               title: 'Меню пользователя',
               position: 'pos_user_menu',
               tag: 'div',
               type: 'custom',
-              wrapper: '<div class="ml-auto d-flex align-items-center">\n    {position}\n</div>'
-            }
-          ]
+              wrapper: '<div class="ml-auto d-flex align-items-center">\n    {position}\n</div>',
+            },
+          ],
         },
         {
           title: 'Навбар',
@@ -551,9 +557,9 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               tag: 'div',
               type: 'custom',
               wrapper: '{position}',
-              col: 'col'
-            }
-          ]
+              col: 'col',
+            },
+          ],
         },
         {
           title: 'Ряд во всю ширину',
@@ -568,9 +574,9 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               tag: 'div',
               type: 'custom',
               wrapper: '{position}',
-              col: 'col-sm'
-            }
-          ]
+              col: 'col-sm',
+            },
+          ],
         },
         {
           title: 'Перед контентом',
@@ -583,9 +589,9 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               position: 'pos_before_content',
               tag: 'div',
               class: 'mb-3 mb-md-4',
-              col: 'col-sm-12'
-            }
-          ]
+              col: 'col-sm-12',
+            },
+          ],
         },
         {
           title: 'Контент',
@@ -598,7 +604,7 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               tag: 'aside',
               class: 'mb-3 mb-md-4',
               col_lg: 'col-lg-3',
-              order: 1
+              order: 1,
             },
             {
               title: 'Тело страницы',
@@ -606,7 +612,7 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               tag: 'article',
               class: 'mb-3 mb-md-4',
               col_lg: 'col-lg',
-              order: 2
+              order: 2,
             },
             {
               title: 'Правая колонка',
@@ -614,9 +620,9 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               tag: 'aside',
               class: 'mb-3 mb-md-4',
               col_lg: 'col-lg-4',
-              order: 3
-            }
-          ]
+              order: 3,
+            },
+          ],
         },
         {
           title: 'Над футером',
@@ -632,23 +638,23 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               position: 'pos_prefooter_left',
               tag: 'div',
               class: 'mb-3',
-              col_md: 'col-md-3'
+              col_md: 'col-md-3',
             },
             {
               title: 'Средний',
               position: 'pos_prefooter_center',
               tag: 'div',
               class: 'mb-3',
-              col_md: 'col-md'
+              col_md: 'col-md',
             },
             {
               title: 'Правый',
               position: 'pos_prefooter_right',
               tag: 'div',
               class: 'mb-3',
-              col_md: 'col-md'
-            }
-          ]
+              col_md: 'col-md',
+            },
+          ],
         },
         {
           title: 'Футер',
@@ -665,19 +671,19 @@ export const layoutPresets: Record<string, { description: string; scheme: Layout
               position: 'pos_footer',
               tag: 'div',
               class: 'mt-2 mt-sm-0 mb-1 mb-sm-0',
-              col_md: 'col-md-6'
+              col_md: 'col-md-6',
             },
             {
               title: 'Меню',
               position: 'pos_footer_menu',
               tag: 'div',
-              col_md: 'col-md-6'
-            }
-          ]
-        }
-      ]
-    }
-  }
+              col_md: 'col-md-6',
+            },
+          ],
+        },
+      ],
+    },
+  },
 };
 
 /** Returns a list of available preset names with descriptions */
@@ -686,8 +692,6 @@ export function listLayoutPresets(): object {
     name,
     description: preset.description,
     rows_count: preset.scheme.rows.length,
-    positions: preset.scheme.rows.flatMap(r =>
-      (r.cols || []).map(c => c.position || '(auto)')
-    )
+    positions: preset.scheme.rows.flatMap(r => (r.cols || []).map(c => c.position || '(auto)')),
   }));
 }

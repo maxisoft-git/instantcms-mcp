@@ -1,12 +1,10 @@
-import { addonStructures, templateStructure } from "../data/schemas.js";
-
 interface ScaffoldAddonOptions {
   name: string;
   title: string;
   author?: string;
   author_url?: string;
   version?: string;
-  type: "basic" | "with_admin" | "with_hooks" | "with_routes" | "with_widget";
+  type: 'basic' | 'with_admin' | 'with_hooks' | 'with_routes' | 'with_widget';
   hooks?: string[];
   description?: string;
 }
@@ -15,9 +13,9 @@ export function scaffoldAddon(opts: ScaffoldAddonOptions): object {
   const name = opts.name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
   const Name = name.split('_').map(capitalize).join('');
   const NAME = name.toUpperCase();
-  const version = opts.version || "1.0.0";
-  const author = opts.author || "Author";
-  const author_url = opts.author_url || "https://example.com";
+  const version = opts.version || '1.0.0';
+  const author = opts.author || 'Author';
+  const author_url = opts.author_url || 'https://example.com';
   const title = opts.title;
   const description = opts.description || `Дополнение ${title}`;
 
@@ -230,7 +228,10 @@ define('LANG_${NAME}_CP_ADD',    'Добавить элемент');`;
   // ── Хуки ────────────────────────────────────────────────────────────────────
   if (opts.hooks && opts.hooks.length > 0) {
     for (const hookName of opts.hooks) {
-      const hookCamel = hookName.split('_').map((w: string) => capitalize(w)).join('');
+      const hookCamel = hookName
+        .split('_')
+        .map((w: string) => capitalize(w))
+        .join('');
       files[`${ctrl}/hooks/${hookName}.php`] = `<?php
 // Хук: ${hookName}
 // Регистрация в manifest.xml: <hook controller="${name}" name="${hookName}" />
@@ -275,7 +276,11 @@ class on${Name}${hookCamel} extends cmsAction {
     files[`${ctrl}/backend/actions/items.php`] = generateBackendActionItems(name, Name, NAME);
 
     // backend/actions/items_add.php — добавление/редактирование с трейтом formItem
-    files[`${ctrl}/backend/actions/items_add.php`] = generateBackendActionItemsAdd(name, Name, NAME);
+    files[`${ctrl}/backend/actions/items_add.php`] = generateBackendActionItemsAdd(
+      name,
+      Name,
+      NAME
+    );
 
     // backend/grids/grid_items.php — ФУНКЦИЯ, не класс!
     files[`${ctrl}/backend/grids/grid_items.php`] = generateGridItems(name, Name, NAME);
@@ -314,7 +319,7 @@ class on${Name}${hookCamel} extends cmsAction {
       opts.type === 'with_admin'
         ? `4. Шаблоны бэкенда: /templates/admincoreui/controllers/${name}/index.tpl.php`
         : `4. При необходимости добавить виджеты в widgets/`,
-    ]
+    ],
   };
 }
 
@@ -397,7 +402,7 @@ return [
 body { font-family: sans-serif; color: var(--color-text); background: var(--color-bg); margin: 0; }
 .site-wrap { display: flex; max-width: 1200px; margin: 0 auto; padding: 0 16px; gap: 24px; }
 .site-main { flex: 1; min-width: 0; }
-.sidebar { width: 240px; flex-shrink: 0; }`
+.sidebar { width: 240px; flex-shrink: 0; }`,
   };
 
   return {
@@ -410,7 +415,7 @@ body { font-family: sans-serif; color: var(--color-text); background: var(--colo
       `Для бэкенда используется шаблон admincoreui (не фронтенд-шаблон)`,
       `Переменные в .tpl.php: $this->title(), $this->body(), $this->widgets('position'), $this->breadcrumbs()`,
       `Проверка виджетов: $this->hasWidgetsOn('right-top')`,
-    ]
+    ],
   };
 }
 
@@ -490,7 +495,7 @@ class modelBackend${Name} extends model${Name} {
 }
 
 // backend/actions/index.php — дашборд
-function generateBackendActionIndex(name: string, Name: string, NAME: string): string {
+function generateBackendActionIndex(name: string, Name: string, _NAME: string): string {
   return `<?php
 /**
  * Дашборд бэкенда.
@@ -622,7 +627,7 @@ class action${Name}ItemsAdd extends cmsAction {
 }
 
 // backend/grids/grid_items.php — ФУНКЦИЯ, не класс!
-function generateGridItems(name: string, Name: string, NAME: string): string {
+function generateGridItems(name: string, _Name: string, _NAME: string): string {
   return `<?php
 // ВАЖНО: грид — это ФУНКЦИЯ, а не класс!
 // Имя функции = grid_ + значение $this->grid_name из экшена
@@ -689,7 +694,7 @@ function grid_items($controller) {
 }
 
 // backend/forms/form_item.php
-function generateFormItem(Name: string, NAME: string): string {
+function generateFormItem(Name: string, _NAME: string): string {
   return `<?php
 
 class form${Name}Item extends cmsForm {

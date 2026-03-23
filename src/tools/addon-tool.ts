@@ -1,13 +1,19 @@
-import { addonStructures, fieldTypes, controllerDirectoryLayout, classNamingConventions } from "../data/schemas.js";
-import { components } from "../data/components.js";
+import {
+  addonStructures,
+  fieldTypes,
+  controllerDirectoryLayout,
+  classNamingConventions,
+} from '../data/schemas.js';
+import { components } from '../data/components.js';
+import { hooks } from '../data/hooks.js';
 
-export function getAddonStructure(addonType: string = "basic"): object {
+export function getAddonStructure(addonType: string = 'basic'): object {
   const structure = addonStructures[addonType];
 
   if (!structure) {
     return {
       error: `Тип дополнения "${addonType}" не найден`,
-      available_types: Object.keys(addonStructures)
+      available_types: Object.keys(addonStructures),
     };
   }
 
@@ -17,67 +23,71 @@ export function getAddonStructure(addonType: string = "basic"): object {
     notes: structure.notes || [],
     available_types: Object.keys(addonStructures).map(t => ({
       key: t,
-      description: addonStructures[t].description
+      description: addonStructures[t].description,
     })),
     files: structure.files.map(f => ({
       path: f.path,
       required: f.required,
       description: f.description,
-      template: f.template
+      template: f.template,
     })),
     directory_layout: controllerDirectoryLayout,
     naming_conventions: classNamingConventions,
     db_conventions: {
-      table_naming: "Таблицы: {addon_name}_{entity}. Пример: catalog_items, catalog_categories",
-      prefix: "Префикс из конфига: в install.php используйте $this->db->prefix, в SQL-запросах — {prefix}",
+      table_naming: 'Таблицы: {addon_name}_{entity}. Пример: catalog_items, catalog_categories',
+      prefix:
+        'Префикс из конфига: в install.php используйте $this->db->prefix, в SQL-запросах — {prefix}',
       common_fields: {
-        id: "INT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
-        user_id: "INT UNSIGNED — ID автора",
-        date_pub: "DATETIME — дата публикации",
-        is_pub: "TINYINT(1) — статус (1=опубликован, 0=скрыт)",
-        title: "VARCHAR(255) — заголовок",
-        ordering: "INT UNSIGNED — порядок сортировки (для drag&drop в гридах)"
-      }
+        id: 'INT UNSIGNED AUTO_INCREMENT PRIMARY KEY',
+        user_id: 'INT UNSIGNED — ID автора',
+        date_pub: 'DATETIME — дата публикации',
+        is_pub: 'TINYINT(1) — статус (1=опубликован, 0=скрыт)',
+        title: 'VARCHAR(255) — заголовок',
+        ordering: 'INT UNSIGNED — порядок сортировки (для drag&drop в гридах)',
+      },
     },
     url_structure: {
-      frontend: "/{addon_name}/{action}/{param}",
-      backend: "/admin/{addon_name}/{action}/{param}",
+      frontend: '/{addon_name}/{action}/{param}',
+      backend: '/admin/{addon_name}/{action}/{param}',
       examples: [
-        "/{name}/ → action index (actions/index.php)",
+        '/{name}/ → action index (actions/index.php)',
         "/{name}/view/123 → action view (actions/view.php), request->get('id')=123",
-        "/admin/{name}/ → backend action index (backend/actions/index.php)",
-        "/admin/{name}/items → backend action items (backend/actions/items.php)",
+        '/admin/{name}/ → backend action index (backend/actions/index.php)',
+        '/admin/{name}/items → backend action items (backend/actions/items.php)',
         "/admin/{name}/items/add → external_action_prefix='items_' → backend/actions/items_add.php",
-        "/admin/{name}/items/edit/5 → backend/actions/items_add.php с params[0]=5"
-      ]
+        '/admin/{name}/items/edit/5 → backend/actions/items_add.php с params[0]=5',
+      ],
     },
     language_files: {
-      location: "/system/languages/{lang}/controllers/{name}/{name}.php",
-      note: "Языковые файлы расположены ВНЕ папки контроллера!",
+      location: '/system/languages/{lang}/controllers/{name}/{name}.php',
+      note: 'Языковые файлы расположены ВНЕ папки контроллера!',
       examples: [
-        "/system/languages/ru/controllers/catalog/catalog.php",
-        "/system/languages/en/controllers/catalog/catalog.php"
-      ]
+        '/system/languages/ru/controllers/catalog/catalog.php',
+        '/system/languages/en/controllers/catalog/catalog.php',
+      ],
     },
     template_files: {
-      frontend: "/templates/{theme}/controllers/{name}/{action}.tpl.php",
-      backend: "/templates/admincoreui/controllers/{name}/{action}.tpl.php",
-      widgets: "/templates/{theme}/controllers/{name}/{widget_name}.tpl.php"
-    }
+      frontend: '/templates/{theme}/controllers/{name}/{action}.tpl.php',
+      backend: '/templates/admincoreui/controllers/{name}/{action}.tpl.php',
+      widgets: '/templates/{theme}/controllers/{name}/{widget_name}.tpl.php',
+    },
   };
 }
 
 export function getComponentApi(componentName: string): object {
   const lower = componentName.toLowerCase();
   const component = components.find(
-    c => c.name.toLowerCase().includes(lower) ||
-         c.class.toLowerCase().includes(lower)
+    c => c.name.toLowerCase().includes(lower) || c.class.toLowerCase().includes(lower)
   );
 
   if (!component) {
     return {
       error: `Компонент "${componentName}" не найден`,
-      available: components.map(c => ({ name: c.name, class: c.class, description: c.description.slice(0, 80) }))
+      available: components.map(c => ({
+        name: c.name,
+        class: c.class,
+        description: c.description.slice(0, 80),
+      })),
     };
   }
 
@@ -86,7 +96,7 @@ export function getComponentApi(componentName: string): object {
     class: component.class,
     description: component.description,
     access: component.access,
-    methods: component.methods
+    methods: component.methods,
   };
 }
 
@@ -98,8 +108,8 @@ export function listComponents(): object {
       class: c.class,
       description: c.description,
       methods_count: c.methods.length,
-      access: c.access
-    }))
+      access: c.access,
+    })),
   };
 }
 
@@ -109,6 +119,7 @@ export function validateAddon(structure: Record<string, string>): object {
   const tips: string[] = [];
 
   const files = Object.keys(structure);
+  const addonName = extractAddonName(structure);
 
   // Обязательные файлы
   const required = ['manifest.xml', 'install.php', 'uninstall.php', 'frontend.php'];
@@ -121,10 +132,45 @@ export function validateAddon(structure: Record<string, string>): object {
   // Проверки manifest.xml
   if (structure['manifest.xml']) {
     const manifest = structure['manifest.xml'];
-    if (!manifest.includes('<name>')) errors.push('manifest.xml: отсутствует тег <name>');
-    if (!manifest.includes('<title>')) errors.push('manifest.xml: отсутствует тег <title>');
-    if (!manifest.includes('<version>')) warnings.push('manifest.xml: рекомендуется указать <version>');
-    if (!manifest.includes('<author>')) warnings.push('manifest.xml: рекомендуется указать <author>');
+
+    // Базовые теги
+    if (!manifest.includes('<name>')) {
+      errors.push('manifest.xml: отсутствует тег <name>');
+    }
+    if (!manifest.includes('<title>')) {
+      errors.push('manifest.xml: отсутствует тег <title>');
+    }
+    if (!manifest.includes('<version>')) {
+      warnings.push('manifest.xml: рекомендуется указать <version>');
+    }
+    if (!manifest.includes('<author>')) {
+      warnings.push('manifest.xml: рекомендуется указать <author>');
+    }
+    if (!manifest.includes('<description>')) {
+      warnings.push('manifest.xml: рекомендуется указать <description>');
+    }
+
+    // Проверка хуков в manifest
+    const manifestHooks = extractHooksFromManifest(manifest);
+    if (manifestHooks.length > 0) {
+      const validHooks = hooks.map(h => h.name);
+      for (const hookName of manifestHooks) {
+        if (!validHooks.includes(hookName)) {
+          warnings.push(`manifest.xml: хук "${hookName}" не найден в системе. Возможно опечатка?`);
+        }
+      }
+    }
+
+    // Проверка permissions
+    const permissions = extractPermissionsFromManifest(manifest);
+    if (permissions.length > 0) {
+      tips.push(`permissions: найдено ${permissions.length} прав (${permissions.join(', ')})`);
+    }
+
+    // Проверка зависимостей
+    if (manifest.includes('<dependencies>')) {
+      tips.push('manifest.xml: есть зависимости от других компонентов');
+    }
   }
 
   // Проверки frontend.php
@@ -135,6 +181,10 @@ export function validateAddon(structure: Record<string, string>): object {
     }
     if (!frontend.includes('actionIndex') && !frontend.includes('function action')) {
       warnings.push('frontend.php: нет ни одного action-метода (actionIndex и т.д.)');
+    }
+    // Проверка неймспейса
+    if (!frontend.includes('namespace') && !frontend.includes('class ')) {
+      warnings.push('frontend.php: рекомендуется использовать неймспейсы');
     }
   }
 
@@ -155,6 +205,10 @@ export function validateAddon(structure: Record<string, string>): object {
     if (!install.includes('public function install()')) {
       errors.push('install.php: отсутствует метод install()');
     }
+    // Проверка создания таблиц
+    if (!install.includes('createTable') && !install.includes('query')) {
+      warnings.push('install.php: не найдено создание таблиц (createTable или query)');
+    }
   }
 
   // Проверки uninstall.php
@@ -165,6 +219,10 @@ export function validateAddon(structure: Record<string, string>): object {
     }
     if (!uninstall.includes('public function uninstall()')) {
       errors.push('uninstall.php: отсутствует метод uninstall()');
+    }
+    // Проверка удаления таблиц
+    if (!uninstall.includes('dropTable')) {
+      warnings.push('uninstall.php: не найдено удаление таблиц (dropTable)');
     }
   }
 
@@ -181,11 +239,58 @@ export function validateAddon(structure: Record<string, string>): object {
     if (content && !content.includes('return $data')) {
       warnings.push(`${hookFile}: метод run() должен возвращать $data`);
     }
+
+    // Извлекаем имя хука из имени файла
+    const hookFileName = hookFile.replace('hooks/', '').replace('.php', '');
+    const hookMatch = hookFileName.match(/^on(\w+)(.+)$/i);
+    if (hookMatch && addonName) {
+      const expectedHook = hookMatch[2]
+        .replace(/([A-Z])/g, '_$1')
+        .toLowerCase()
+        .replace(/^_/, '');
+      const validHook = hooks.find(h => h.name === expectedHook);
+      if (validHook) {
+        tips.push(`${hookFile}: хук "${expectedHook}" найден в системе`);
+      }
+    }
+  }
+
+  // Проверки форм
+  const formFiles = files.filter(f => f.startsWith('forms/'));
+  for (const formFile of formFiles) {
+    const content = structure[formFile];
+    if (content && !content.includes('extends cmsForm')) {
+      errors.push(`${formFile}: класс формы должен наследовать cmsForm`);
+    }
+    if (content && !content.includes('public function init(')) {
+      errors.push(`${formFile}: отсутствует метод init() с полями формы`);
+    }
+  }
+
+  // Проверки модели
+  if (structure['model.php']) {
+    const model = structure['model.php'];
+    if (!model.includes('cmsModel')) {
+      warnings.push('model.php: рекомендуется наследовать cmsModel');
+    }
   }
 
   // Проверки языковых файлов
   if (!files.some(f => f.startsWith('languages/'))) {
     warnings.push('Нет языковых файлов в languages/. Рекомендуется добавить languages/ru/lang.php');
+  }
+
+  // Проверка версии PHP
+  if (structure['manifest.xml'] && structure['manifest.xml'].includes('<php_version>')) {
+    const phpMatch = structure['manifest.xml'].match(/<php_version>([^<]+)<\/php_version>/);
+    if (phpMatch) {
+      const minVersion = phpMatch[1];
+      if (compareVersions(minVersion, '7.2.0') < 0) {
+        errors.push(
+          `manifest.xml: минимальная версия PHP ${minVersion} ниже поддерживаемой (7.2.0)`
+        );
+      }
+    }
   }
 
   // Советы
@@ -195,17 +300,97 @@ export function validateAddon(structure: Record<string, string>): object {
   if (!structure['routes.php']) {
     tips.push('Если нужны кастомные URL — добавьте routes.php');
   }
+  if (!structure['model.php']) {
+    tips.push('Рекомендуется создать model.php для работы с базой данных');
+  }
+  if (files.some(f => f.endsWith('.php') && !f.includes('/'))) {
+    warnings.push(
+      'PHP файлы в корневой директории. Все файлы должны быть внутри system/controllers/{addon}/'
+    );
+  }
 
   return {
     is_valid: errors.length === 0,
     files_checked: files.length,
+    addon_name: addonName || 'не определено',
     errors,
     warnings,
     tips,
-    summary: errors.length === 0
-      ? `✓ Дополнение прошло валидацию (${warnings.length} предупреждений)`
-      : `✗ Найдено ${errors.length} ошибок, ${warnings.length} предупреждений`
+    summary:
+      errors.length === 0
+        ? `✓ Дополнение прошло валидацию (${warnings.length} предупреждений, ${tips.length} советов)`
+        : `✗ Найдено ${errors.length} ошибок, ${warnings.length} предупреждений, ${tips.length} советов`,
+    checked_categories: {
+      required_files: required.every(f => files.includes(f)),
+      manifest_valid: structure['manifest.xml']
+        ? structure['manifest.xml'].includes('<name>') &&
+          structure['manifest.xml'].includes('<title>')
+        : false,
+      hooks_valid:
+        hookFiles.length === 0 ||
+        hookFiles.every(
+          f =>
+            structure[f]?.includes('extends cmsAction') &&
+            structure[f]?.includes('public function run')
+        ),
+      forms_valid:
+        formFiles.length === 0 ||
+        formFiles.every(
+          f =>
+            structure[f]?.includes('extends cmsForm') &&
+            structure[f]?.includes('public function init')
+        ),
+    },
   };
+}
+
+function extractAddonName(structure: Record<string, string>): string | null {
+  if (structure['manifest.xml']) {
+    const match = structure['manifest.xml'].match(/<name>([^<]+)<\/name>/);
+    if (match) return match[1];
+  }
+  if (structure['frontend.php']) {
+    const match = structure['frontend.php'].match(/class\s+(\w+)\s+extends/);
+    if (match) return match[1].replace('Controller', '').toLowerCase();
+  }
+  return null;
+}
+
+function extractHooksFromManifest(manifest: string): string[] {
+  const hooks: string[] = [];
+  const hookRegex = /<hook[^>]*name=["']([^"']+)["'][^>]*>/gi;
+  let match;
+  while ((match = hookRegex.exec(manifest)) !== null) {
+    hooks.push(match[1]);
+  }
+  // Также ищем <hook event="...">
+  const eventRegex = /<hook[^>]*event=["']([^"']+)["'][^>]*>/gi;
+  while ((match = eventRegex.exec(manifest)) !== null) {
+    hooks.push(match[1]);
+  }
+  return hooks;
+}
+
+function extractPermissionsFromManifest(manifest: string): string[] {
+  const perms: string[] = [];
+  const permRegex = /<item[^>]*name=["']([^"']+)["'][^>]*>/gi;
+  let match;
+  while ((match = permRegex.exec(manifest)) !== null) {
+    perms.push(match[1]);
+  }
+  return perms;
+}
+
+function compareVersions(a: string, b: string): number {
+  const partsA = a.split('.').map(Number);
+  const partsB = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+    const partA = partsA[i] || 0;
+    const partB = partsB[i] || 0;
+    if (partA > partB) return 1;
+    if (partA < partB) return -1;
+  }
+  return 0;
 }
 
 export function getFieldTypes(fieldType?: string): object {
@@ -214,7 +399,7 @@ export function getFieldTypes(fieldType?: string): object {
     if (!ft) {
       return {
         error: `Тип поля "${fieldType}" не найден`,
-        available: Object.keys(fieldTypes)
+        available: Object.keys(fieldTypes),
       };
     }
     return { name: fieldType, ...ft };
@@ -225,22 +410,28 @@ export function getFieldTypes(fieldType?: string): object {
     field_types: Object.entries(fieldTypes).map(([name, info]) => ({
       name,
       description: info.description,
-      example: info.example
+      example: info.example,
     })),
-    usage_note: "Поля используются в классах форм (cmsForm). Экземпляры передаются в массив init()"
+    usage_note: 'Поля используются в классах форм (cmsForm). Экземпляры передаются в массив init()',
   };
 }
 
 export function getCodeExample(task: string): object {
   const lower = task.toLowerCase();
 
-  const examples: Array<{ keywords: string[]; title: string; code: string; explanation: string; category: string }> = [
+  const examples: Array<{
+    keywords: string[];
+    title: string;
+    code: string;
+    explanation: string;
+    category: string;
+  }> = [
     // СПИСКИ И ПАГИНАЦИЯ
     {
       keywords: ['список', 'items', 'list', 'страниц', 'paginat', 'index'],
-      title: "Список элементов с пагинацией",
-      category: "pagination",
-      explanation: "Паттерн получения постраничного списка из БД",
+      title: 'Список элементов с пагинацией',
+      category: 'pagination',
+      explanation: 'Паттерн получения постраничного списка из БД',
       code: `public function actionIndex() {
     $page    = $this->request->get('page', 1);
     $perpage = $this->options['perpage'] ?? 10;
@@ -258,13 +449,13 @@ export function getCodeExample(task: string): object {
         'page'    => $page,
         'perpage' => $perpage,
     ]);
-}`
+}`,
     },
     {
       keywords: ['один', 'item', 'detail', 'просмотр', 'view'],
-      title: "Просмотр одного элемента",
-      category: "item",
-      explanation: "Паттерн для страницы просмотра элемента",
+      title: 'Просмотр одного элемента',
+      category: 'item',
+      explanation: 'Паттерн для страницы просмотра элемента',
       code: `public function actionView($id) {
 
     $item = $this->model
@@ -280,13 +471,13 @@ export function getCodeExample(task: string): object {
     return $this->cms_template->render('view', [
         'item' => $item
     ]);
-}`
+}`,
     },
     {
       keywords: ['join', 'связь', 'related', 'users', 'user_id'],
-      title: "Получение элементов с данными пользователя",
-      category: "joins",
-      explanation: "JOIN с таблицей пользователей для получения nickname",
+      title: 'Получение элементов с данными пользователя',
+      category: 'joins',
+      explanation: 'JOIN с таблицей пользователей для получения nickname',
       code: `$items = $this->model
     ->select('i.*')
     ->select('u.nickname as user_nickname', 'u.avatar as user_avatar')
@@ -296,13 +487,13 @@ export function getCodeExample(task: string): object {
     ->limit(20)
     ->get('myaddon_items i');
 
-// В шаблоне: $item['user_nickname'], $item['user_avatar']`
+// В шаблоне: $item['user_nickname'], $item['user_avatar']`,
     },
     {
       keywords: ['группировка', 'group', 'count', 'groupBy', 'статистика'],
-      title: "Группировка и подсчёт",
-      category: "aggregation",
-      explanation: "GROUP BY для статистики",
+      title: 'Группировка и подсчёт',
+      category: 'aggregation',
+      explanation: 'GROUP BY для статистики',
       code: `$stats = $this->model
     ->select('category_id')
     ->select('COUNT(*) as cnt')
@@ -310,14 +501,14 @@ export function getCodeExample(task: string): object {
     ->orderBy('cnt', 'desc')
     ->get('myaddon_items');
 
-// Результат: [['category_id' => 1, 'cnt' => 15], ...]`
+// Результат: [['category_id' => 1, 'cnt' => 15], ...]`,
     },
     // AJAX И JSON
     {
       keywords: ['ajax', 'json', 'fetch', 'запрос', 'api'],
-      title: "Обработка AJAX запроса",
-      category: "ajax",
-      explanation: "Паттерн для AJAX action, возвращающего JSON",
+      title: 'Обработка AJAX запроса',
+      category: 'ajax',
+      explanation: 'Паттерн для AJAX action, возвращающего JSON',
       code: `public function actionSave() {
 
     if (!$this->request->isPost() || !$this->request->isAjax()) {
@@ -341,13 +532,13 @@ export function getCodeExample(task: string): object {
         'success' => true,
         'id'      => $id
     ]);
-}`
+}`,
     },
     {
       keywords: ['удалить', 'delete', 'del'],
-      title: "AJAX удаление элемента",
-      category: "ajax",
-      explanation: "Удаление с проверкой прав и AJAX ответом",
+      title: 'AJAX удаление элемента',
+      category: 'ajax',
+      explanation: 'Удаление с проверкой прав и AJAX ответом',
       code: `public function actionDelete() {
 
     if (!$this->request->isAjax()) {
@@ -369,14 +560,14 @@ export function getCodeExample(task: string): object {
     $this->model->delete('myaddon_items', $id);
 
     return $this->renderJSON(['success' => true]);
-}`
+}`,
     },
     // ФОРМЫ
     {
       keywords: ['форм', 'form', 'валидац', 'add', 'create'],
-      title: "Обработка формы добавления",
-      category: "forms",
-      explanation: "Паттерн для страницы с формой добавления",
+      title: 'Обработка формы добавления',
+      category: 'forms',
+      explanation: 'Паттерн для страницы с формой добавления',
       code: `public function actionAdd() {
 
     $form = $this->makeForm('form_item');
@@ -401,13 +592,13 @@ export function getCodeExample(task: string): object {
     return $this->cms_template->render('add', [
         'form' => $form->render()
     ]);
-}`
+}`,
     },
     {
       keywords: ['edit', 'редактир', 'update', 'изменить'],
-      title: "Форма редактирования",
-      category: "forms",
-      explanation: "Паттерн для редактирования существующего элемента",
+      title: 'Форма редактирования',
+      category: 'forms',
+      explanation: 'Паттерн для редактирования существующего элемента',
       code: `public function actionEdit($id) {
 
     $item = $this->model->getItemByField('myaddon_items', 'id', $id);
@@ -434,14 +625,14 @@ export function getCodeExample(task: string): object {
         'form' => $form->render($item),
         'item'  => $item
     ]);
-}`
+}`,
     },
     // КЭШИРОВАНИЕ
     {
       keywords: ['кэш', 'cache', 'кэшировани'],
-      title: "Кэширование данных",
-      category: "cache",
-      explanation: "Паттерн get-or-set кэширования",
+      title: 'Кэширование данных',
+      category: 'cache',
+      explanation: 'Паттерн get-or-set кэширования',
       code: `public function getPopularItems(): array {
 
     $cache = cmsCache::getInstance();
@@ -460,13 +651,13 @@ export function getCodeExample(task: string): object {
     }
 
     return $items ?: [];
-}`
+}`,
     },
     {
       keywords: ['cache set', 'cache get', 'cache clean', 'cmscache'],
-      title: "cmsCache API — set, get, clean",
-      category: "cache",
-      explanation: "Базовые операции с кэшем",
+      title: 'cmsCache API — set, get, clean',
+      category: 'cache',
+      explanation: 'Базовые операции с кэшем',
       code: `$cache = cmsCache::getInstance();
 
 // SET — записать в кэш (TTL в секундах)
@@ -484,13 +675,13 @@ if ($data === false) {
 // CLEAN — очистить кэш по ключу
 $cache->clean('my_key');              // один ключ
 $cache->clean('myaddon.items');       // все ключи начинающиеся с 'myaddon.items'
-$cache->clean();                      // ОЧИСТИТЬ ВЕСЬ КЭШ (осторожно!)`
+$cache->clean();                      // ОЧИСТИТЬ ВЕСЬ КЭШ (осторожно!)`,
     },
     {
       keywords: ['cache pause', 'cache resume', 'отключить кэш'],
-      title: "Временное отключение кэша",
-      category: "cache",
-      explanation: "pause/resume для массовых операций",
+      title: 'Временное отключение кэша',
+      category: 'cache',
+      explanation: 'pause/resume для массовых операций',
       code: `// Отключить кэширование во время массовой операции
 $cache = cmsCache::getInstance();
 $cache->pause();  // Кэширование отключено
@@ -502,13 +693,13 @@ foreach ($items as $item) {
 
 $cache->resume(); // Восстановить кэширование
 
-// После resume старые ключи остаются, но будут обновлены при следующем get/set`
+// После resume старые ключи остаются, но будут обновлены при следующем get/set`,
     },
     {
       keywords: ['cache options', 'cache_path', 'cache_ttl'],
-      title: "Настройки кэширования",
-      category: "cache",
-      explanation: "Конфигурация cache_method, cache_ttl",
+      title: 'Настройки кэширования',
+      category: 'cache',
+      explanation: 'Конфигурация cache_method, cache_ttl',
       code: `// system/config/autoload.php или в cmsConfig:
 $cfg = [
     'cache_enabled' => true,
@@ -521,13 +712,13 @@ $cfg = [
 if (cmsConfig::get('cache_enabled')) {
     $cache = cmsCache::getInstance();
     // ...
-}`
+}`,
     },
     {
       keywords: ['cache redis', 'memcache', 'memcached'],
-      title: "Redis/Memcached кэш",
-      category: "cache",
-      explanation: "Использование Redis или Memcached",
+      title: 'Redis/Memcached кэш',
+      category: 'cache',
+      explanation: 'Использование Redis или Memcached',
       code: `// В config/autoload.php:
 $cfg = [
     'cache_enabled' => true,
@@ -541,13 +732,13 @@ $cfg = [
 $cache = cmsCache::getInstance();
 $cache->set('key', $data, 3600);
 $data = $cache->get('key');
-$cache->clean('key');`
+$cache->clean('key');`,
     },
     {
       keywords: ['cache page', 'page cache', 'старт стоп'],
-      title: "Кэширование страниц",
-      category: "cache",
-      explanation: "start/stop для полного кэширования страницы",
+      title: 'Кэширование страниц',
+      category: 'cache',
+      explanation: 'start/stop для полного кэширования страницы',
       code: `// В bootstrap.php или начале action:
 cmsCache::getInstance()->start();
 
@@ -556,13 +747,13 @@ cmsCache::getInstance()->start();
 cmsCache::getInstance()->stop();
 
 // Внимание: start/stop работают только если cache_method поддерживает это
-// (не все cacher-ы имеют start/stop: Files — имеет, Redis — нет)`
+// (не все cacher-ы имеют start/stop: Files — имеет, Redis — нет)`,
     },
     {
       keywords: ['cache dependency', 'depends', 'зависимос'],
-      title: "Инвалидация кэша при изменениях",
-      category: "cache",
-      explanation: "Чистка кэша при добавлении/редактировании/удалении",
+      title: 'Инвалидация кэша при изменениях',
+      category: 'cache',
+      explanation: 'Чистка кэша при добавлении/редактировании/удалении',
       code: `// При добавлении элемента:
 public function actionAdd() {
     // ... сохранение ...
@@ -594,13 +785,13 @@ public function actionDelete($id) {
     cmsCache::getInstance()->clean('myaddon.item.' . $id);
     cmsCache::getInstance()->clean('myaddon.list');
     cmsCache::getInstance()->clean('myaddon.popular');
-}`
+}`,
     },
     {
       keywords: ['cache tag', 'key pattern', 'group'],
-      title: "Именование ключей кэша",
-      category: "cache",
-      explanation: "Соглашение об именовании для групповой инвалидации",
+      title: 'Именование ключей кэша',
+      category: 'cache',
+      explanation: 'Соглашение об именовании для групповой инвалидации',
       code: `// Соглашение: используйте точки для группировки
 // Формат: {addon}.{entity}.{specific}
 
@@ -617,14 +808,14 @@ $cache->set('myaddon.item.' . $id, $item, 7200);
 $cache->set('myaddon.popular', $popular, 1800);
 
 // Чистка группы:
-$cache->clean('myaddon'); // Чистит ВСЕ ключи myaddon.*`
+$cache->clean('myaddon'); // Чистит ВСЕ ключи myaddon.*`,
     },
     // ХУКИ И СОБЫТИЯ
     {
       keywords: ['хук', 'hook', 'событи', 'event'],
-      title: "Создание и вызов хука",
-      category: "hooks",
-      explanation: "Как добавить свои хуки для расширяемости",
+      title: 'Создание и вызов хука',
+      category: 'hooks',
+      explanation: 'Как добавить свои хуки для расширяемости',
       code: `// 1. Запуск хука:
 $item = cmsEventsManager::hook('myaddon_before_item', $item);
 
@@ -640,14 +831,14 @@ class onMyaddonBeforeItem extends cmsAction {
         $item['custom_field'] = 'processed';
         return $data;
     }
-}`
+}`,
     },
     // ПРАВА ДОСТУПА
     {
       keywords: ['прав', 'перм', 'permission', 'acl', 'доступ', 'is_admin'],
-      title: "Проверка прав доступа",
-      category: "permissions",
-      explanation: "Работа с системой прав пользователей",
+      title: 'Проверка прав доступа',
+      category: 'permissions',
+      explanation: 'Работа с системой прав пользователей',
       code: `public function actionSecure() {
 
     if (!$this->cms_user->is_logged) {
@@ -663,14 +854,14 @@ class onMyaddonBeforeItem extends cmsAction {
     }
 
     return $this->cms_template->render('secure_page');
-}`
+}`,
     },
     // ФАЙЛЫ И ИЗОБРАЖЕНИЯ
     {
       keywords: ['файл', 'upload', 'загруз', 'изображ', 'image', 'file'],
-      title: "Загрузка файлов/изображений",
-      category: "files",
-      explanation: "Работа с загрузкой файлов через поле fieldImage",
+      title: 'Загрузка файлов/изображений',
+      category: 'files',
+      explanation: 'Работа с загрузкой файлов через поле fieldImage',
       code: `// В форме:
 new fieldImage('photo', [
     'title'     => 'Фото',
@@ -686,14 +877,14 @@ public function actionAdd() {
         $item_data = $form->parse($this->request->data('post'));
         // $item_data['photo'] содержит путь к файлу
     }
-}`
+}`,
     },
     // RSS
     {
       keywords: ['rss', 'feed', 'лент'],
-      title: "RSS лента",
-      category: "rss",
-      explanation: "Генерация RSS ленты для контента",
+      title: 'RSS лента',
+      category: 'rss',
+      explanation: 'Генерация RSS ленты для контента',
       code: `public function actionRss() {
 
     $items = $this->model
@@ -720,14 +911,14 @@ public function actionAdd() {
     }
 
     return $this->cms_template->renderRSS($feed);
-}`
+}`,
     },
     // SITEMAP
     {
       keywords: ['sitemap', 'site', 'map', 'поисковик', 'seo'],
-      title: "Генерация sitemap",
-      category: "sitemap",
-      explanation: "Интеграция с модулем sitemap",
+      title: 'Генерация sitemap',
+      category: 'sitemap',
+      explanation: 'Интеграция с модулем sitemap',
       code: `// 1. В manifest.xml:
 <hooks>
     <hook event="sitemap_sources" />
@@ -765,14 +956,14 @@ class onMyaddonSitemapUrls extends cmsAction {
         }
         return $data;
     }
-}`
+}`,
     },
     // ПОИСК
     {
       keywords: ['search', 'поиск', 'fulltext', 'найти'],
-      title: "Интеграция с поиском",
-      category: "search",
-      explanation: "Добавление контента в поисковый индекс",
+      title: 'Интеграция с поиском',
+      category: 'search',
+      explanation: 'Добавление контента в поисковый индекс',
       code: `// 1. manifest.xml:
 <hooks>
     <hook event="search_sources" />
@@ -804,14 +995,14 @@ class onMyaddonSearchItem extends cmsAction {
         }
         return $data;
     }
-}`
+}`,
     },
     // ТЕГИ
     {
       keywords: ['tag', 'тег', 'tags'],
-      title: "Работа с тегами",
-      category: "tags",
-      explanation: "Интеграция с системой тегов",
+      title: 'Работа с тегами',
+      category: 'tags',
+      explanation: 'Интеграция с системой тегов',
       code: `// 1. manifest.xml:
 <hooks>
     <hook event="tagsdelete" />
@@ -822,14 +1013,14 @@ $tags = $this->request->post('tags', []);
 cmsCore::getModel('tags')->bindTags($tags, $item_id, $this->name);
 
 // 3. При удалении - очистка тегов:
-$this->model->deleteFiltered('tags_items', ['target_id' => $item_id]);`
+$this->model->deleteFiltered('tags_items', ['target_id' => $item_id]);`,
     },
     // КАТЕГОРИИ
     {
       keywords: ['categor', 'категор', 'parent'],
-      title: "Иерархия категорий",
-      category: "categories",
-      explanation: "Работа с вложенными категориями",
+      title: 'Иерархия категорий',
+      category: 'categories',
+      explanation: 'Работа с вложенными категориями',
       code: `// Получить дерево категорий:
 $cats = $this->model->getCategoriesTree($ctype['name']);
 
@@ -844,14 +1035,14 @@ $cats = $this->model->getCategoriesTree($ctype['name']);
 $path = $this->model->getCategoryPath($category_id);
 
 // ID всех потомков категории:
-$child_ids = $this->model->getCategoryChildren($category_id);`
+$child_ids = $this->model->getCategoryChildren($category_id);`,
     },
     // РЕЙТИНГ
     {
       keywords: ['rating', 'рейтинг', 'голос'],
-      title: "Интеграция с рейтингом",
-      category: "rating",
-      explanation: "Добавление голосования к элементам",
+      title: 'Интеграция с рейтингом',
+      category: 'rating',
+      explanation: 'Добавление голосования к элементам',
       code: `// 1. manifest.xml:
 <hooks>
     <hook event="rating_vote" />
@@ -867,14 +1058,14 @@ class onMyaddonRatingVote extends cmsAction {
         
         return $data;
     }
-}`
+}`,
     },
     // КОММЕНТАРИИ
     {
       keywords: ['comment', 'коммент'],
-      title: "Интеграция с комментариями",
-      category: "comments",
-      explanation: "Включение комментариев к элементам",
+      title: 'Интеграция с комментариями',
+      category: 'comments',
+      explanation: 'Включение комментариев к элементам',
       code: `// 1. manifest.xml:
 <hooks>
     <hook event="comments_count" />
@@ -891,14 +1082,14 @@ class onMyaddonCommentsCount extends cmsAction {
         $data['comments_count'] = $count;
         return $data;
     }
-}`
+}`,
     },
     // УВЕДОМЛЕНИЯ
     {
       keywords: ['notice', 'уведомл', 'email', 'notification'],
-      title: "Отправка уведомлений",
-      category: "notifications",
-      explanation: "Отправка email и in-site уведомлений",
+      title: 'Отправка уведомлений',
+      category: 'notifications',
+      explanation: 'Отправка email и in-site уведомлений',
       code: `// Email уведомление:
 cmsCore::sendEmail([
     'to'      => $user_email,
@@ -910,14 +1101,14 @@ cmsCore::sendEmail([
 cmsCore::getController('messages')->addNotice($user_id, 'myaddon_notification', [
     'content' => $message,
     'options' => ['link' => href_to($this->name, 'view', $item_id)]
-]);`
+]);`,
     },
     // SEO
     {
       keywords: ['seo', 'meta', 'title', 'description', 'og'],
-      title: "SEO метатеги",
-      category: "seo",
-      explanation: "Настройка метатегов для страниц",
+      title: 'SEO метатеги',
+      category: 'seo',
+      explanation: 'Настройка метатегов для страниц',
       code: `// В action:
 public function actionView($id) {
     $item = $this->model->getItemByField('myaddon_items', 'id', $id);
@@ -933,14 +1124,14 @@ public function actionView($id) {
     ]);
 
     return $this->cms_template->render('view', ['item' => $item]);
-}`
+}`,
     },
     // CRUD COMPLETE
     {
       keywords: ['crud', 'create', 'read', 'update', 'delete', 'полный'],
-      title: "Полный CRUD контроллер",
-      category: "crud",
-      explanation: "Шаблон минимального CRUD контроллера",
+      title: 'Полный CRUD контроллер',
+      category: 'crud',
+      explanation: 'Шаблон минимального CRUD контроллера',
       code: `class myaddon extends cmsFrontend {
 
     // Список
@@ -972,14 +1163,14 @@ public function actionView($id) {
         $this->model->delete('myaddon_items', $id);
         return $this->redirect(href_to($this->name));
     }
-}`
+}`,
     },
     // МИГРАЦИЯ БД
     {
       keywords: ['migration', 'install', 'uninstall', 'sql', 'таблиц'],
-      title: "Создание таблиц при установке",
-      category: "migration",
-      explanation: "Пример install.php с созданием таблицы",
+      title: 'Создание таблиц при установке',
+      category: 'migration',
+      explanation: 'Пример install.php с созданием таблицы',
       code: `class installerMyaddon extends cmsInstaller {
 
     public function install() {
@@ -1010,9 +1201,9 @@ public function actionView($id) {
     // SECURITY - XSS
     {
       keywords: ['xss', 'html', 'escape', 'безопасност', 'sanitize'],
-      title: "Защита от XSS",
-      category: "security",
-      explanation: "Фильтрация HTML и экранирование вывода",
+      title: 'Защита от XSS',
+      category: 'security',
+      explanation: 'Фильтрация HTML и экранирование вывода',
       code: `// 1. В модели - валидация HTML:
 public function validateHtml($content) {
     // Разрешённые теги
@@ -1026,14 +1217,14 @@ public function validateHtml($content) {
 
 // 3. Не доверяйте пользовательскому вводу:
 $title = strip_tags($this->request->get('title', ''));
-$title = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');`
+$title = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');`,
     },
     // SECURITY - CSRF
     {
       keywords: ['csrf', 'token', 'form', 'csrf_token'],
-      title: "Защита от CSRF",
-      category: "security",
-      explanation: "CSRF токен для форм и AJAX запросов",
+      title: 'Защита от CSRF',
+      category: 'security',
+      explanation: 'CSRF токен для форм и AJAX запросов',
       code: `// 1. В форме - добавление токена:
 <form method="post">
     <?php csrf_field(); ?>
@@ -1055,14 +1246,14 @@ if ($this->request->isPost()) {
     if (!cmsForm::validateCSRFToken($this->request->get('csrf_token'))) {
         return $this->renderJSON(['error' => 'Invalid token']);
     }
-}`
+}`,
     },
     // SECURITY - SQL INJECTION
     {
       keywords: ['sql', 'injection', 'query', 'базы'],
-      title: "Защита от SQL Injection",
-      category: "security",
-      explanation: "Использование query builder вместо сырых запросов",
+      title: 'Защита от SQL Injection',
+      category: 'security',
+      explanation: 'Использование query builder вместо сырых запросов',
       code: `// ✅ ПРАВИЛЬНО - используйте model:
 $items = $this->model
     ->filterEqual('user_id', $user_id)  // параметризованный запрос
@@ -1076,14 +1267,14 @@ $item = $this->model->getItemByField('myaddon_items', 'id', (int)$id);
 $query = "SELECT * FROM cms_myaddon WHERE id = " . $_GET['id']; // УЯЗВИМОСТЬ!
 
 // ✅ Если нужен сырой запрос - используйте параметры:
-$this->db->query("SELECT * FROM {myaddon_items} WHERE id = %d", $id);`
+$this->db->query("SELECT * FROM {myaddon_items} WHERE id = %d", $id);`,
     },
     // SECURITY - ACCESS CONTROL
     {
       keywords: ['access', 'rbac', 'роль', 'admin', 'moderator'],
-      title: "RBAC - Контроль доступа",
-      category: "security",
-      explanation: "Проверка прав по ролям и группам",
+      title: 'RBAC - Контроль доступа',
+      category: 'security',
+      explanation: 'Проверка прав по ролям и группам',
       code: `// 1. Проверка группы:
 if (!$this->cms_user->isInGroup('admins')) {
     return cmsCore::error403();
@@ -1105,14 +1296,14 @@ if ($item['user_id'] !== $this->cms_user->id && !$this->cms_user->is_admin) {
     <item name="add" title="Добавление" />
     <item name="edit" title="Редактирование" />
     <item name="delete" title="Удаление" />
-</permissions>`
+</permissions>`,
     },
     // SECURITY - FILE UPLOAD
     {
       keywords: ['upload', 'file', 'безопасн', 'extension'],
-      title: "Безопасная загрузка файлов",
-      category: "security",
-      explanation: "Проверка типа и размера файла",
+      title: 'Безопасная загрузка файлов',
+      category: 'security',
+      explanation: 'Проверка типа и размера файла',
       code: `// 1. Проверка расширения:
 $allowed = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx'];
 $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
@@ -1136,20 +1327,18 @@ if ($file_size > $max_size) {
 }
 
 // 4. Генерация случайного имени:
-$new_name = md5(uniqid()) . '.' . $ext;`
-    }
+$new_name = md5(uniqid()) . '.' . $ext;`,
+    },
   ];
 
-  const matched = examples.filter(ex =>
-    ex.keywords.some(kw => lower.includes(kw))
-  );
+  const matched = examples.filter(ex => ex.keywords.some(kw => lower.includes(kw)));
 
   if (matched.length === 0) {
     return {
-      message: "Точный пример не найден. Доступные темы:",
+      message: 'Точный пример не найден. Доступные темы:',
       available_topics: examples.map(ex => ex.title),
       categories: [...new Set(examples.map(ex => ex.category))],
-      tip: "Попробуйте: 'список', 'ajax', 'форма', 'кэш', 'права', 'rss', 'sitemap', 'поиск', 'теги', 'рейтинг', 'уведомления', 'crud', 'миграция'"
+      tip: "Попробуйте: 'список', 'ajax', 'форма', 'кэш', 'права', 'rss', 'sitemap', 'поиск', 'теги', 'рейтинг', 'уведомления', 'crud', 'миграция'",
     };
   }
 
@@ -1160,7 +1349,114 @@ $new_name = md5(uniqid()) . '.' . $ext;`
       title: ex.title,
       category: ex.category,
       explanation: ex.explanation,
-      code: ex.code
-    }))
+      code: ex.code,
+    })),
   };
+}
+
+export function scaffoldHook(params: {
+  addon_name: string;
+  hook_name: string;
+  type?: 'action' | 'filter';
+}): object {
+  const { addon_name, hook_name, type = 'action' } = params;
+
+  // Поиск хука в системе
+  const systemHook = hooks.find(h => h.name === hook_name);
+
+  // Генерация имени класса
+  const className = buildHookClassName(addon_name, hook_name);
+
+  // Путь к файлу
+  const filePath = `hooks/${hook_name}.php`;
+
+  // Генерация параметров для run метода
+  let paramsCode = '';
+  let paramsDoc = '';
+  const returnCode = 'return $data;';
+
+  if (systemHook) {
+    const hookParams = systemHook.parameters;
+    if (hookParams.length > 0 && hookParams[0].name !== '$data') {
+      paramsDoc = hookParams.map(p => ` * @param ${p.type} ${p.name} ${p.description}`).join('\n');
+      paramsCode = hookParams
+        .map(p => {
+          const paramName = p.name.startsWith('$') ? p.name.slice(1) : p.name;
+          return `        ${paramName} = $data['${paramName}'] ?? null`;
+        })
+        .join(',\n');
+    }
+  }
+
+  // Определение типа возврата
+  const isFilter = systemHook?.type === 'filter' || type === 'filter';
+
+  // Шаблон кода
+  const code = `<?php
+
+/**
+ * ${systemHook?.description || `Хук: ${hook_name}`}
+ * 
+${paramsDoc}
+ * @return ${isFilter ? 'mixed (для filter)' : 'void (для action)'}
+ */
+class ${className} extends cmsAction {
+
+    public function run(${paramsCode ? '\n' + paramsCode + '\n    ' : ''}) {
+
+${
+  isFilter
+    ? `        // Фильтр: модифицируйте $data и верните
+        // Пример:
+        // $data['key'] = 'new_value';
+        ${returnCode}`
+    : `        // Action: выполните действия
+        // Не забудьте вернуть $data для цепочки хуков
+        ${returnCode}`
+}
+    }
+
+}`.trim();
+
+  // manifest.xml запись
+  const manifestEntry = `<hook controller="${addon_name}" name="${hook_name}" />`;
+
+  // Языковой ключ
+  const langKey = `${addon_name.toUpperCase()}_HOOK_${hook_name.toUpperCase().replace(/_/g, '_')}`;
+
+  return {
+    hook_name,
+    hook_type: isFilter ? 'filter' : 'action',
+    system_hook: systemHook
+      ? {
+          name: systemHook.name,
+          category: systemHook.category,
+          description: systemHook.description,
+          parameters: systemHook.parameters,
+          return_type: systemHook.return_type,
+        }
+      : null,
+    addon_name,
+    class_name: className,
+    file_path: filePath,
+    code,
+    manifest_xml: manifestEntry,
+    lang_key: langKey,
+    usage: {
+      step1: `Добавьте в manifest.xml:\n${manifestEntry}`,
+      step2: `Создайте файл: ${filePath}`,
+      step3: `Добавьте языковую константу в languages/ru/lang.php:\nLANG_${langKey} = 'Описание хука';`,
+      step4: 'Перейдите в Панель управления → Дополнения и включите хук',
+    },
+  };
+}
+
+function buildHookClassName(addonName: string, hookName: string): string {
+  // Преобразуем snake_case в CamelCase для hookName
+  const hookParts = hookName.split('_');
+  const camelHook = hookParts
+    .map((part, i) => (i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)))
+    .join('');
+
+  return `on${addonName.charAt(0).toUpperCase() + addonName.slice(1)}${camelHook.charAt(0).toUpperCase() + camelHook.slice(1)}`;
 }

@@ -13,6 +13,9 @@
     "inspector": "npx @modelcontextprotocol/inspector tsx src/index.ts",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "lint": "eslint src/ --ext .ts",
+    "lint:fix": "eslint src/ --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
     "parse:database": "tsx src/tools/parser/sql-parser.ts",
     "parse:events": "tsx src/tools/parser/events-parser.ts",
     "parse:controllers": "tsx src/tools/parser/controllers-parser.ts",
@@ -21,7 +24,12 @@
     "parse:fields": "tsx src/tools/parser/fields-parser.ts",
     "parse:core": "tsx src/tools/parser/core-parser.ts",
     "parse:all": "npm run parse:database && npm run parse:events && npm run parse:controllers && npm run parse:widgets && npm run parse:traits && npm run parse:fields && npm run parse:core && tsx src/tools/parser/coverage-generator.ts",
-    "coverage": "tsx src/tools/parser/coverage-generator.ts"
+    "coverage": "tsx src/tools/parser/coverage-generator.ts",
+    "prepare": "husky install",
+    "release": "release-it",
+    "release:patch": "release-it --increment patch",
+    "release:minor": "release-it --increment minor",
+    "release:major": "release-it --increment major"
   },
   "keywords": [
     "mcp",
@@ -31,6 +39,12 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@types/node": "^25.3.3",
@@ -41,7 +55,15 @@
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.2",
+    "husky": "^9.1.7",
     "jest": "^30.3.0",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.1",
+    "release-it": "^19.2.4",
     "ts-jest": "^29.4.6"
   }
 }
