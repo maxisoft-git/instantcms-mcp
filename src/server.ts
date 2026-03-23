@@ -74,6 +74,9 @@ import { scaffoldCache } from './tools/cache-tool.js';
 import { scaffoldWebhook } from './tools/webhook-tool.js';
 import { scaffoldExternalApi } from './tools/external-api-tool.js';
 import { scaffoldOAuth } from './tools/oauth-tool.js';
+import { scaffoldComponent } from './tools/component-tool.js';
+import { scaffoldWidget } from './tools/widget-tool.js';
+import { scaffoldTemplate as scaffoldTheme } from './tools/template-tool.js';
 import { analyzeRequirement, suggestAddonStructure } from './tools/requirement-tool.js';
 
 import { hooks, hookCategories } from './data/hooks.js';
@@ -2255,6 +2258,134 @@ export function createServer(): McpServer {
     },
     async opts => {
       const result = scaffoldOAuth(opts as Parameters<typeof scaffoldOAuth>[0]);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    }
+  );
+
+  // ── 53. Генерация компонента ───────────────────────────────────────────
+  server.tool(
+    'scaffold_component',
+    'Генерация полного компонента InstantCMS с backend, frontend, model',
+    {
+      addon_name: z.string().describe('Имя компонента'),
+      controllers: z
+        .array(
+          z.object({
+            name: z.string().describe('Имя контроллера'),
+            actions: z.array(z.string()).describe('Экшены'),
+            use_model: z.boolean().optional().describe('Использовать модель'),
+          })
+        )
+        .optional()
+        .describe('Контроллеры'),
+      options: z
+        .object({
+          with_frontend: z.boolean().optional().describe('С frontend'),
+          with_admin: z.boolean().optional().describe('С админкой'),
+          with_model: z.boolean().optional().describe('С моделью'),
+          with_routes: z.boolean().optional().describe('С роутами'),
+          with_menu: z.boolean().optional().describe('С меню'),
+        })
+        .optional()
+        .describe('Опции'),
+    },
+    async opts => {
+      const result = scaffoldComponent(opts as Parameters<typeof scaffoldComponent>[0]);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    }
+  );
+
+  // ── 54. Генерация виджета ──────────────────────────────────────────────
+  server.tool(
+    'scaffold_widget',
+    'Генерация виджета InstantCMS с настройками и шаблонами',
+    {
+      addon_name: z.string().describe('Имя компонента'),
+      widget_name: z.string().describe('Имя виджета'),
+      options: z
+        .array(
+          z.object({
+            name: z.string().describe('Имя опции'),
+            type: z
+              .enum(['text', 'number', 'select', 'checkbox', 'textarea', 'image'])
+              .describe('Тип поля'),
+            label: z.string().describe('Название'),
+            options: z
+              .array(z.object({ value: z.string(), label: z.string() }))
+              .optional()
+              .describe('Опции для select'),
+            default: z
+              .union([z.string(), z.boolean(), z.number()])
+              .optional()
+              .describe('Значение по умолчанию'),
+          })
+        )
+        .optional()
+        .describe('Опции виджета'),
+      options_config: z
+        .object({
+          with_template: z.boolean().optional().describe('С шаблоном'),
+          with_styles: z.boolean().optional().describe('Со стилями'),
+          with_cache: z.boolean().optional().describe('С кэшированием'),
+        })
+        .optional()
+        .describe('Конфигурация'),
+    },
+    async opts => {
+      const result = scaffoldWidget(opts as Parameters<typeof scaffoldWidget>[0]);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    }
+  );
+
+  // ── 55. Генерация темы шаблона ─────────────────────────────────────────
+  server.tool(
+    'scaffold_template_theme',
+    'Генерация темы шаблона InstantCMS с layout, стилями и поддержкой dark mode',
+    {
+      template_name: z.string().describe('Имя шаблона'),
+      options: z
+        .object({
+          with_layout: z.boolean().optional().describe('С layout.yaml'),
+          with_responsive: z.boolean().optional().describe('Адаптивный дизайн'),
+          with_dark_mode: z.boolean().optional().describe('Тёмная тема'),
+          withRTL: z.boolean().optional().describe('RTL поддержка'),
+        })
+        .optional()
+        .describe('Опции'),
+      layout_blocks: z
+        .array(
+          z.object({
+            name: z.string().describe('Название блока'),
+            position: z.string().describe('Позиция виджетов'),
+            class: z.string().optional().describe('CSS класс'),
+          })
+        )
+        .optional()
+        .describe('Блоки layout'),
+    },
+    async opts => {
+      const result = scaffoldTheme(opts as Parameters<typeof scaffoldTheme>[0]);
       return {
         content: [
           {

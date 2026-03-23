@@ -26,6 +26,9 @@ import { scaffoldCache } from '../tools/cache-tool';
 import { scaffoldWebhook } from '../tools/webhook-tool';
 import { scaffoldExternalApi } from '../tools/external-api-tool';
 import { scaffoldOAuth } from '../tools/oauth-tool';
+import { scaffoldComponent } from '../tools/component-tool';
+import { scaffoldWidget } from '../tools/widget-tool';
+import { scaffoldTemplate as scaffoldTheme } from '../tools/template-tool';
 import { scaffoldLayoutScheme, listLayoutPresets } from '../tools/layout-tool';
 import {
   introspectDatabase,
@@ -1371,6 +1374,125 @@ describe('OAuth Tool', () => {
     expect(hooksFile).toContain('onLoginOauthOAuthHook');
     expect(hooksFile).toContain('btn-google');
     expect(hooksFile).toContain('btn-vkontakte');
+  });
+});
+
+describe('Component Tool', () => {
+  test('scaffoldComponent generates component files', () => {
+    const result = scaffoldComponent({
+      addon_name: 'my_component',
+    }) as any;
+    expect(result).toHaveProperty('addon_name', 'my_component');
+    expect(result).toHaveProperty('controllers_count', 1);
+    expect('my_component/manifest.json' in result.files).toBe(true);
+    expect('my_component/backend.php' in result.files).toBe(true);
+    expect('my_component/frontend.php' in result.files).toBe(true);
+    expect('my_component/model.php' in result.files).toBe(true);
+  });
+
+  test('scaffoldComponent generates manifest with correct structure', () => {
+    const result = scaffoldComponent({
+      addon_name: 'test_comp',
+      controllers: [{ name: 'items', actions: ['index', 'view'], use_model: true }],
+    }) as any;
+    const manifest = result.files['test_comp/manifest.json'];
+    expect(manifest).toContain("'type' => 'component'");
+    expect(manifest).toContain("'name' => 'test_comp'");
+  });
+
+  test('scaffoldComponent with options generates additional files', () => {
+    const result = scaffoldComponent({
+      addon_name: 'full_comp',
+      options: { with_routes: true, with_menu: true },
+    }) as any;
+    expect('full_comp/routes.php' in result.files).toBe(true);
+    expect('full_comp/menu.php' in result.files).toBe(true);
+  });
+
+  test('scaffoldComponent generates backend with controllers', () => {
+    const result = scaffoldComponent({
+      addon_name: 'backend_test',
+      controllers: [{ name: 'products', actions: ['index', 'add', 'edit'] }],
+    }) as any;
+    const backend = result.files['backend_test/backend.php'];
+    expect(backend).toContain('BackendTestBackend');
+    expect(backend).toContain('getBackendMenu');
+  });
+});
+
+describe('Widget Tool', () => {
+  test('scaffoldWidget generates widget files', () => {
+    const result = scaffoldWidget({
+      addon_name: 'blog',
+      widget_name: 'recent_posts',
+    }) as any;
+    expect(result).toHaveProperty('addon_name', 'blog');
+    expect(result).toHaveProperty('widget_name', 'recent_posts');
+    expect('blog/widgets/recent_posts.php' in result.files).toBe(true);
+    expect('blog/widgets/recent_posts.options.php' in result.files).toBe(true);
+    expect('blog/widgets/recent_posts.html.php' in result.files).toBe(true);
+  });
+
+  test('scaffoldWidget generates widget class with options', () => {
+    const result = scaffoldWidget({
+      addon_name: 'news',
+      widget_name: 'latest_news',
+      options: [
+        { name: 'title', type: 'text', label: 'Заголовок', default: 'Latest News' },
+        { name: 'limit', type: 'number', label: 'Количество', default: 5 },
+      ],
+    }) as any;
+    const widgetFile = result.files['news/widgets/latest_news.php'];
+    expect(widgetFile).toContain('LatestNewsWidget');
+    expect(widgetFile).toContain('getOptions');
+  });
+
+  test('scaffoldWidget with styles generates CSS', () => {
+    const result = scaffoldWidget({
+      addon_name: 'test_widget',
+      widget_name: 'custom',
+      options_config: { with_styles: true },
+    }) as any;
+    expect('test_widget/widgets/custom.css' in result.files).toBe(true);
+  });
+});
+
+describe('Template Theme Tool', () => {
+  test('scaffoldTemplate generates template files', () => {
+    const result = scaffoldTheme({
+      template_name: 'my_theme',
+    }) as any;
+    expect(result).toHaveProperty('template_name', 'my_theme');
+    expect(result).toHaveProperty('blocks_count', 5);
+    expect('my_theme/manifest.json' in result.files).toBe(true);
+    expect('my_theme/main.tpl.php' in result.files).toBe(true);
+    expect('my_theme/main.css' in result.files).toBe(true);
+  });
+
+  test('scaffoldTemplate generates manifest with options', () => {
+    const result = scaffoldTheme({
+      template_name: 'dark_theme',
+      options: { with_dark_mode: true, with_responsive: true },
+    }) as any;
+    const manifest = result.files['dark_theme/manifest.json'];
+    expect(manifest).toContain('dark_mode');
+    expect(manifest).toContain('responsive');
+  });
+
+  test('scaffoldTemplate with layout generates YAML', () => {
+    const result = scaffoldTheme({
+      template_name: 'layout_test',
+      options: { with_layout: true },
+    }) as any;
+    expect('layout_test/layout.yaml' in result.files).toBe(true);
+  });
+
+  test('scaffoldTemplate generates header and footer templates', () => {
+    const result = scaffoldTheme({
+      template_name: 'test_template',
+    }) as any;
+    expect('test_template/header.tpl.php' in result.files).toBe(true);
+    expect('test_template/footer.tpl.php' in result.files).toBe(true);
   });
 });
 
