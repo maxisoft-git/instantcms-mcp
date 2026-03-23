@@ -1701,14 +1701,12 @@ describe('Requirement Tool', () => {
 
 const fs = require('fs');
 const SOURCE_PATH = './source/system/core/user.php';
+const sourceExists = fs.existsSync(SOURCE_PATH);
 
-describe('Core Parser', () => {
-  const sourceExists = fs.existsSync(SOURCE_PATH);
+const describeOrSkip = sourceExists ? describe : describe.skip;
 
+describeOrSkip('Core Parser', () => {
   test('parseCoreFile parses user.php correctly', () => {
-    if (!sourceExists) {
-      return test.skip('source files not available, skipping test');
-    }
     const { parseCoreFile } = require('../tools/parser/core-parser');
     const result = parseCoreFile('./source/system/core/user.php');
     expect(result).not.toBeNull();
@@ -1718,9 +1716,6 @@ describe('Core Parser', () => {
   });
 
   test('parseCoreFile parses database.php correctly', () => {
-    if (!sourceExists) {
-      return test.skip('source files not available, skipping test');
-    }
     const { parseCoreFile } = require('../tools/parser/core-parser');
     const result = parseCoreFile('./source/system/core/database.php');
     expect(result).not.toBeNull();
@@ -1729,9 +1724,6 @@ describe('Core Parser', () => {
   });
 
   test('parseCoreFile parses config.php correctly', () => {
-    if (!sourceExists) {
-      return test.skip('source files not available, skipping test');
-    }
     const { parseCoreFile } = require('../tools/parser/core-parser');
     const result = parseCoreFile('./source/system/core/config.php');
     expect(result).not.toBeNull();
@@ -1740,9 +1732,6 @@ describe('Core Parser', () => {
   });
 
   test('parseCoreFile parses autoloader.php correctly', () => {
-    if (!sourceExists) {
-      return test.skip('source files not available, skipping test');
-    }
     const { parseCoreFile } = require('../tools/parser/core-parser');
     const result = parseCoreFile('./source/system/core/autoloader.php');
     expect(result).not.toBeNull();
@@ -1750,18 +1739,12 @@ describe('Core Parser', () => {
   });
 
   test('parseAllCoreFiles finds 38 classes', () => {
-    if (!sourceExists) {
-      return test.skip('source files not available, skipping test');
-    }
     const { parseAllCoreFiles } = require('../tools/parser/core-parser');
     const result = parseAllCoreFiles('./source');
     expect(result.length).toBe(38);
   });
 
   test('cmsUser has some public methods', () => {
-    if (!sourceExists) {
-      return test.skip('source files not available, skipping test');
-    }
     const { parseCoreFile } = require('../tools/parser/core-parser');
     const result = parseCoreFile('./source/system/core/user.php');
     const publicMethods = result.methods.filter((m: any) => m.visibility === 'public');
@@ -1769,9 +1752,6 @@ describe('Core Parser', () => {
   });
 
   test('cmsDatabase has expected public methods', () => {
-    if (!sourceExists) {
-      return test.skip('source files not available, skipping test');
-    }
     const { parseCoreFile } = require('../tools/parser/core-parser');
     const result = parseCoreFile('./source/system/core/database.php');
     const publicMethods = result.methods.filter((m: any) => m.visibility === 'public');
@@ -1782,9 +1762,6 @@ describe('Core Parser', () => {
   });
 
   test('cmsPermissions has expected methods', () => {
-    if (!sourceExists) {
-      return test.skip('source files not available, skipping test');
-    }
     const { parseCoreFile } = require('../tools/parser/core-parser');
     const result = parseCoreFile('./source/system/core/permissions.php');
     const publicMethods = result.methods.filter((m: any) => m.visibility === 'public');
@@ -1793,18 +1770,12 @@ describe('Core Parser', () => {
   });
 
   test('cmsPaginator has some methods', () => {
-    if (!sourceExists) {
-      return test.skip('source files not available, skipping test');
-    }
     const { parseCoreFile } = require('../tools/parser/core-parser');
     const result = parseCoreFile('./source/system/core/paginator.php');
     expect(result.methods.length).toBeGreaterThan(0);
   });
 
   test('cmsResponse has some public methods', () => {
-    if (!sourceExists) {
-      return test.skip('source files not available, skipping test');
-    }
     const { parseCoreFile } = require('../tools/parser/core-parser');
     const result = parseCoreFile('./source/system/core/response.php');
     const publicMethods = result.methods.filter((m: any) => m.visibility === 'public');
@@ -1813,9 +1784,6 @@ describe('Core Parser', () => {
   });
 
   test('all core classes have required properties', () => {
-    if (!sourceExists) {
-      return test.skip('source files not available, skipping test');
-    }
     const { parseAllCoreFiles } = require('../tools/parser/core-parser');
     const classes = parseAllCoreFiles('./source');
     classes.forEach((cls: any) => {
