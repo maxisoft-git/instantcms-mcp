@@ -15,7 +15,7 @@ import { scaffoldLayoutScheme, listLayoutPresets, layoutPresets } from "./tools/
 import { introspectDatabase, listContentTypes, listDatabaseEvents, describeTable } from "./tools/db-tool.js";
 import { analyzeController, listControllers, getControllerActionsList, listSystemTraits } from "./tools/controllers-tool.js";
 import { mariaExecuteQuery, mariaListTables, mariaDescribeTable, mariaGetDatabaseInfo, mariaSearchTables, mariaGetTableData } from "./tools/maria-tool.js";
-import { listWidgets, getWidgetInfo, listTraits, getTraitInfo, listFields, getFieldInfo } from "./tools/source-tool.js";
+import { listWidgets, getWidgetInfo, listTraits, getTraitInfo, listFields, getFieldInfo, listRoutes } from "./tools/source-tool.js";
 import { generateMigration, generateFieldSuggestions } from "./tools/migration-tool.js";
 import { analyzeRequirement, suggestAddonStructure } from "./tools/requirement-tool.js";
 
@@ -755,7 +755,25 @@ export function createServer(): McpServer {
     }
   );
 
-  // ── 35. Генерация миграции ────────────────────────────────────────────
+  // ── 35. Список маршрутов ───────────────────────────────────────────────
+  server.tool(
+    "list_routes",
+    "Список всех маршрутов (routes) системы. Маршруты определяют URL-паттерны и действия контроллеров.",
+    {
+      controller: z.string().optional().describe("Имя контроллера для фильтрации (content, photos)")
+    },
+    async ({ controller }) => {
+      const result = listRoutes(controller);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // ── 36. Генерация миграции ────────────────────────────────────────────
   server.tool(
     "generate_migration",
     "Генерация SQL и PHP кода для создания таблицы. Генерирует install.php, SQL CREATE TABLE и соглашения по именованию.",

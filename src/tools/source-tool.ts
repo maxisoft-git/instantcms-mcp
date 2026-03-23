@@ -1,6 +1,7 @@
 import { widgetsMap, getWidget, getWidgetsByController, getSystemWidgets } from "../data/widgets-map.js";
 import { traitsMap, getTrait, getTraitMethods, getTraitsByNamespace } from "../data/traits-map.js";
 import { fieldsMap, getField, getFieldTypes, getSystemFields } from "../data/fields-map.js";
+import { routesMap, getRoutesByController, getAllRoutes } from "../data/routes-map.js";
 
 export function listWidgets(controller?: string): object {
   let widgets = widgetsMap.widgets;
@@ -131,5 +132,34 @@ export function getFieldInfo(name: string): object {
     hasOptions: field.hasOptions,
     options: field.options,
     description: field.description
+  };
+}
+
+export function listRoutes(controller?: string): object {
+  if (controller) {
+    const routes = getRoutesByController(controller);
+    if (!routes) {
+      return {
+        error: `Controller "${controller}" has no routes`,
+        available: routesMap.controllers.map(c => c.name)
+      };
+    }
+    return {
+      total: routes.routes.length,
+      controller: routes.name,
+      functionName: routes.functionName,
+      filePath: routes.filePath,
+      routes: routes.routes
+    };
+  }
+  
+  return {
+    total: routesMap.routeCount,
+    controllersCount: routesMap.controllers.length,
+    controllers: routesMap.controllers.map(c => ({
+      name: c.name,
+      functionName: c.functionName,
+      routeCount: c.routes.length
+    }))
   };
 }
