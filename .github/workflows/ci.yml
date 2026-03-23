@@ -23,9 +23,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Clone InstantCMS source
-        run: git clone --depth 1 https://github.com/instantsoft/instantcms2.git source
-
       - name: Run TypeScript check
         run: npx tsc --noEmit
 
@@ -50,9 +47,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Clone InstantCMS source
-        run: git clone --depth 1 https://github.com/instantsoft/instantcms2.git source
 
       - name: Build
         run: npm run build
