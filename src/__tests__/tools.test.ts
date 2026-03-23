@@ -955,7 +955,7 @@ describe('SEO Tool', () => {
     expect(result).toHaveProperty('addon_name', 'blog');
     expect(result).toHaveProperty('fields_count', 3);
     expect('blog/seo.php' in result.files).toBe(true);
-    expect('blog/seo.hooks.php' in result.files).toBe(true);
+    expect('system/hooks/blog/seo.hooks.php' in result.files).toBe(true);
   });
 
   test('scaffoldSeo generates sitemap when enabled', () => {
@@ -1000,7 +1000,7 @@ describe('SEO Tool', () => {
       addon_name: 'test_seo',
       options: { use_og_tags: true, use_sitemap: true },
     }) as any;
-    const hooks = result.files['test_seo/seo.hooks.php'];
+    const hooks = result.files['system/hooks/test_seo/seo.hooks.php'];
     expect(hooks).toContain('onTestSeoSeoHook');
     expect(hooks).toContain('function onBeforeRender(');
     expect(hooks).toContain('function onAfterSave(');
@@ -1083,7 +1083,7 @@ describe('Cache Tool', () => {
     }) as any;
     expect(result).toHaveProperty('addon_name', 'blog');
     expect('blog/cache.php' in result.files).toBe(true);
-    expect('blog/cache.hooks.php' in result.files).toBe(true);
+    expect('system/hooks/blog/cache.hooks.php' in result.files).toBe(true);
   });
 
   test('scaffoldCache generates cache class with methods', () => {
@@ -1116,7 +1116,7 @@ describe('Cache Tool', () => {
       addon_name: 'test_cache',
       options: { use_tags: true },
     }) as any;
-    const hooksFile = result.files['test_cache/cache.hooks.php'];
+    const hooksFile = result.files['system/hooks/test_cache/cache.hooks.php'];
     expect(hooksFile).toContain('onTestCacheCacheHook');
     expect(hooksFile).toContain('function onAfterSave(');
     expect(hooksFile).toContain('function onAfterDelete(');
@@ -1370,7 +1370,7 @@ describe('OAuth Tool', () => {
         },
       ],
     }) as any;
-    const hooksFile = result.files['login_oauth/oauth/hooks.php'];
+    const hooksFile = result.files['system/hooks/login_oauth/oauth.hooks.php'];
     expect(hooksFile).toContain('onLoginOauthOAuthHook');
     expect(hooksFile).toContain('btn-google');
     expect(hooksFile).toContain('btn-vkontakte');

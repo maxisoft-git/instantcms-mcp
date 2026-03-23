@@ -1,5 +1,14 @@
-import { z } from 'zod';
+/**
+ * @fileoverview Content filtering system scaffolding tool for InstantCMS
+ * Generates filter classes, forms, hooks, and optional saved filters
+ */
 
+import { z } from 'zod';
+import { normalizeAddonName, type ScaffoldResult } from '../types/scaffold';
+
+/**
+ * Available filter field types
+ */
 const FilterTypeEnum = z.enum([
   'text',
   'select',
@@ -9,72 +18,67 @@ const FilterTypeEnum = z.enum([
   'date',
   'daterange',
 ]);
+
 type FilterType = z.infer<typeof FilterTypeEnum>;
 
+/**
+ * Single filter field definition
+ */
 interface FilterField {
+  /** Database field name */
   field: string;
+  /** Filter type */
   type: FilterType;
+  /** Display label */
   label?: string;
+  /** Options for select/multiselect types */
   options?: { value: string; label: string }[];
+  /** Placeholder text */
   placeholder?: string;
 }
 
+/**
+ * Options for filter generation
+ */
 interface ScaffoldFilterOptions {
+  /** System name of the addon */
   addon_name: string;
+  /** List of filter fields */
   fields: FilterField[];
+  /** Additional configuration */
   options?: {
+    /** Enable AJAX filtering */
     use_ajax?: boolean;
+    /** Use URL parameters for filters */
     use_url_params?: boolean;
+    /** Enable saved filters feature */
     save_filters?: boolean;
   };
 }
 
-export function scaffoldFilter(opts: ScaffoldFilterOptions): object {
-  const name = opts.addon_name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-  const Name = name
-    .split('_')
-    .map(s => s.charAt(0).toUpperCase() + s.slice(1))
-    .join('');
-  const files: Record<string, string> = {};
-
-  const filterFields = opts.fields.map(f => ({
+/**
+ * Normalizes filter field with defaults
+ */
+function normalizeField(f: FilterField): FilterField {
+  return {
     field: f.field,
     type: f.type,
     label: f.label || f.field,
     options: f.options || [],
     placeholder: f.placeholder || '',
-  }));
-
-  files[`${name}/filters.php`] = generateFilterClass(name, Name, filterFields);
-
-  files[`${name}/filter.form.php`] = generateFilterForm(name, Name, filterFields);
-
-  files[`system/hooks/${name}/filter.hooks.php`] = generateFilterHooks(name, Name, filterFields);
-
-  if (opts.options?.save_filters) {
-    files[`${name}/saved_filters.php`] = generateSavedFilters(name, Name, filterFields);
-  }
-
-  return {
-    addon_name: name,
-    filters_count: filterFields.length,
-    options: opts.options || {},
-    files,
-    filters: filterFields.map(f => ({
-      field: f.field,
-      type: f.type,
-      label: f.label,
-    })),
   };
 }
 
-function generateFilterClass(name: string, Name: string, fields: any[]): string {
+/**
+ * Generates the main filter class
+ */
+function generateFilterClass(name: string, Name: string, fields: FilterField[]): string {
   const filterInit = fields
     .map(f => {
       return `        '${f.field}' => [
             'type' => '${f.type}',
             'label' => '${f.label}',
-            'options' => [${f.options.map((o: { value: string; label: string }) => `'${o.value}' => '${o.label}'`).join(', ')}],
+            'options' => [${(f.options || []).map(o => `'${o.value}' => '${o.label}'`).join(', ')}],
         ]`;
     })
     .join(',\n');
@@ -129,39 +133,39 @@ function generateFilterClass(name: string, Name: string, fields: any[]): string 
 class ${Name}Filter {
     private static $instance = null;
     private $filters = [];
-    
+
     private function __construct() {
         $this->filters = $this->getDefaultFilters();
     }
-    
+
     public static function getInstance() {
         if (self::$instance === null) {
             self::$instance = new self();
         }
         return self::$instance;
     }
-    
+
     public function getDefaultFilters() {
         return [
 ${filterInit}
         ];
     }
-    
+
     public function apply($model, $filters = []) {
         if (empty($filters)) {
             return $model;
         }
-        
+
         $where = [];
 ${applyConditions}
-        
+
         if (!empty($where)) {
             $model->where(implode(' AND ', $where));
         }
-        
+
         return $model;
     }
-    
+
     public function getFromRequest($request) {
         $filters = [];
         foreach ($this->filters as $field => $config) {
@@ -172,17 +176,17 @@ ${applyConditions}
         }
         return $filters;
     }
-    
+
     public function validate($filters) {
         $errors = [];
-        
+
         foreach ($filters as $field => $value) {
             if (!isset($this->filters[$field])) {
                 continue;
             }
-            
+
             $config = $this->filters[$field];
-            
+
             switch ($config['type']) {
                 case 'text':
                     if (strlen($value) > 255) {
@@ -207,13 +211,16 @@ ${applyConditions}
                     break;
             }
         }
-        
+
         return $errors;
     }
 }`;
 }
 
-function generateFilterForm(name: string, Name: string, fields: any[]): string {
+/**
+ * Generates the filter form class
+ */
+function generateFilterForm(name: string, Name: string, fields: FilterField[]): string {
   const formFields = fields
     .map(f => {
       const placeholder = f.placeholder ? `, 'placeholder' => '${f.placeholder}'` : '';
@@ -223,15 +230,15 @@ function generateFilterForm(name: string, Name: string, fields: any[]): string {
           return `        $form->addField('${f.field}', new fieldString('${f.label}', [${placeholder}]));`;
         case 'select': {
           const opts =
-            f.options.length > 0
-              ? `['options' => [${f.options.map((o: { value: string; label: string }) => `'${o.value}' => '${o.label}'`).join(', ')}]]`
+            (f.options || []).length > 0
+              ? `['options' => [${(f.options || []).map(o => `'${o.value}' => '${o.label}'`).join(', ')}]]`
               : '';
           return `        $form->addField('${f.field}', new fieldList('${f.label}', ${opts}));`;
         }
         case 'multiselect': {
           const multiOpts =
-            f.options.length > 0
-              ? `['options' => [${f.options.map((o: { value: string; label: string }) => `'${o.value}' => '${o.label}'`).join(', ')}]]`
+            (f.options || []).length > 0
+              ? `['options' => [${(f.options || []).map(o => `'${o.value}' => '${o.label}'`).join(', ')}]]`
               : '';
           return `        $form->addField('${f.field}', new fieldList('${f.label}', ['is_multiple' => true${multiOpts ? ', ' + multiOpts : ''}]));`;
         }
@@ -258,14 +265,17 @@ class ${Name}FilterForm {
     public function __construct($form) {
 ${formFields}
     }
-    
+
     public static function create($form) {
         return new self($form);
     }
 }`;
 }
 
-function generateFilterHooks(name: string, Name: string, _fields: any[]): string {
+/**
+ * Generates hook handlers for filter integration
+ */
+function generateFilterHooks(name: string, Name: string, _fields: FilterField[]): string {
   return `<?php
 // InstantCMS 2. system/hooks/${name}/filter.hooks.php
 
@@ -273,15 +283,15 @@ class on${Name}FilterHook {
     public function onBeforeLoadModel($model) {
         $request = cmsCore::getInstance()->request;
         $filters = ${Name}Filter::getInstance()->getFromRequest($request);
-        
+
         if (!empty($filters)) {
             ${Name}Filter::getInstance()->apply($model, $filters);
-            
+
             // Сохраняем в сессию
             cmsUser::sessionPut('${name}_filters', $filters);
         }
     }
-    
+
     public function onBeforeRender($controller) {
         $filters = cmsUser::sessionGet('${name}_filters', []);
         $controller->renderTemplate('filter', [
@@ -292,14 +302,17 @@ class on${Name}FilterHook {
 }`;
 }
 
-function generateSavedFilters(name: string, Name: string, _fields: any[]): string {
+/**
+ * Generates saved filters feature
+ */
+function generateSavedFilters(name: string, Name: string, _fields: FilterField[]): string {
   return `<?php
 // InstantCMS 2. ${name}/saved_filters.php
 
 class ${Name}SavedFilters {
     public static function save($user_id, $name, $filters) {
         $model = cmsModel::getInstance();
-        
+
         $model->insert('saved_filters', [
             'user_id' => $user_id,
             'name' => $name,
@@ -307,7 +320,7 @@ class ${Name}SavedFilters {
             'created_at' => date('Y-m-d H:i:s'),
         ]);
     }
-    
+
     public static function load($user_id, $filter_id) {
         $model = cmsModel::getInstance();
         return $model->getItemById('saved_filters', $filter_id, false, function ($item) {
@@ -315,7 +328,7 @@ class ${Name}SavedFilters {
             return $item;
         });
     }
-    
+
     public static function getAll($user_id) {
         $model = cmsModel::getInstance();
         return $model->get('saved_filters', function ($item) {
@@ -325,7 +338,7 @@ class ${Name}SavedFilters {
             'user_id' => $user_id,
         ]);
     }
-    
+
     public static function delete($user_id, $filter_id) {
         $model = cmsModel::getInstance();
         return $model->delete('saved_filters', $filter_id, ['user_id' => $user_id]);
@@ -333,67 +346,59 @@ class ${Name}SavedFilters {
 }`;
 }
 
-export const filterToolSchema = {
-  name: 'scaffold_filter',
-  description: 'Генерация системы фильтрации контента для InstantCMS',
-  inputSchema: {
-    type: 'object' as const,
-    properties: {
-      addon_name: { type: 'string', description: 'Имя дополнения' },
-      fields: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            field: { type: 'string', description: 'Имя поля в БД' },
-            type: {
-              type: 'string',
-              enum: ['text', 'select', 'multiselect', 'checkbox', 'range', 'date', 'daterange'],
-              description: 'Тип фильтра',
-            },
-            label: { type: 'string', description: 'Название поля' },
-            options: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: { value: { type: 'string' }, label: { type: 'string' } },
-              },
-              description: 'Опции для select/multiselect',
-            },
-            placeholder: { type: 'string', description: 'Placeholder' },
-          },
-          required: ['field', 'type'],
-        },
-        description: 'Поля фильтра',
-      },
-      options: {
-        type: 'object',
-        properties: {
-          use_ajax: { type: 'boolean', description: 'AJAX фильтрация' },
-          use_url_params: { type: 'boolean', description: 'Параметры в URL' },
-          save_filters: { type: 'boolean', description: 'Сохранение фильтров' },
-        },
-      },
-    },
-    required: ['addon_name', 'fields'],
-  },
-  inputExamples: [
-    {
-      addon_name: 'catalog',
-      fields: [
-        { field: 'price', type: 'range', label: 'Цена' },
-        {
-          field: 'category_id',
-          type: 'select',
-          label: 'Категория',
-          options: [
-            { value: '1', label: 'Электроника' },
-            { value: '2', label: 'Одежда' },
-          ],
-        },
-        { field: 'in_stock', type: 'checkbox', label: 'В наличии' },
-      ],
-      options: { use_ajax: true, save_filters: true },
-    },
-  ],
-};
+/**
+ * Generates a complete filtering system for an InstantCMS addon
+ *
+ * @param opts - Configuration options for the filter system
+ * @returns Object containing generated files and metadata
+ *
+ * @example
+ * ```typescript
+ * const result = scaffoldFilter({
+ *   addon_name: 'catalog',
+ *   fields: [
+ *     { field: 'price', type: 'range', label: 'Цена' },
+ *     { field: 'category_id', type: 'select', label: 'Категория' }
+ *   ],
+ *   options: { use_ajax: true, save_filters: true }
+ * });
+ * ```
+ */
+export function scaffoldFilter(opts: ScaffoldFilterOptions): ScaffoldResult {
+  const { lowercase, UpperCamelCase } = normalizeAddonName(opts.addon_name);
+  const files: Record<string, string> = {};
+
+  const filterFields = opts.fields.map(normalizeField);
+
+  files[`${lowercase}/filters.php`] = generateFilterClass(lowercase, UpperCamelCase, filterFields);
+  files[`${lowercase}/filter.form.php`] = generateFilterForm(
+    lowercase,
+    UpperCamelCase,
+    filterFields
+  );
+  files[`system/hooks/${lowercase}/filter.hooks.php`] = generateFilterHooks(
+    lowercase,
+    UpperCamelCase,
+    filterFields
+  );
+
+  if (opts.options?.save_filters) {
+    files[`${lowercase}/saved_filters.php`] = generateSavedFilters(
+      lowercase,
+      UpperCamelCase,
+      filterFields
+    );
+  }
+
+  return {
+    addon_name: lowercase,
+    filters_count: filterFields.length,
+    options: opts.options || {},
+    files,
+    filters: filterFields.map(f => ({
+      field: f.field,
+      type: f.type,
+      label: f.label,
+    })),
+  };
+}

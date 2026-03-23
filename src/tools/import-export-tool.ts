@@ -1,85 +1,111 @@
+/**
+ * @fileoverview Import/Export scaffolding tool for InstantCMS
+ * Generates import/export classes for CSV, Excel, JSON, and XML formats
+ */
+
+import { z } from 'zod';
+import { normalizeAddonName, type ScaffoldResult } from '../types/scaffold';
+
+/**
+ * Available field types for import/export
+ */
+const FieldTypeEnum = z.enum([
+  'string',
+  'text',
+  'number',
+  'date',
+  'datetime',
+  'bool',
+  'select',
+  'image',
+  'file',
+]);
+
+type FieldType = z.infer<typeof FieldTypeEnum>;
+
+/**
+ * Single import/export field definition
+ */
 interface ImportExportField {
+  /** Database field name */
   field: string;
-  type: 'string' | 'text' | 'number' | 'date' | 'datetime' | 'bool' | 'select' | 'image' | 'file';
+  /** Field type for parsing */
+  type: FieldType;
+  /** Display label in CSV header */
   label?: string;
+  /** Whether field is required */
   required?: boolean;
+  /** Default value */
   default?: string;
+  /** Options for select type */
   options?: { value: string; label: string }[];
 }
 
-interface ImportExportConfig {
+/**
+ * Options for import/export generation
+ */
+interface ScaffoldImportExportOptions {
+  /** System name of the addon */
   addon_name: string;
+  /** List of fields to import/export */
   fields: ImportExportField[];
+  /** Additional configuration */
   options?: {
+    /** Enable CSV format support */
     use_csv?: boolean;
+    /** Enable Excel (XLSX) format support */
     use_xlsx?: boolean;
+    /** Enable JSON API support */
     use_json?: boolean;
+    /** Enable XML format support */
     use_xml?: boolean;
+    /** Number of records per batch */
     batch_size?: number;
+    /** Skip header row in CSV */
     skip_header?: boolean;
+    /** Update existing records by slug */
     update_existing?: boolean;
   };
 }
 
-export function scaffoldImportExport(opts: ImportExportConfig): object {
-  const name = opts.addon_name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-  const Name = name
-    .split('_')
-    .map(s => s.charAt(0).toUpperCase() + s.slice(1))
-    .join('');
-  const files: Record<string, string> = {};
-
-  const fields = opts.fields || [];
-  const options = {
-    use_csv: opts.options?.use_csv ?? true,
-    use_xlsx: opts.options?.use_xlsx ?? true,
-    use_json: opts.options?.use_json ?? true,
-    use_xml: opts.options?.use_xml ?? false,
-    batch_size: opts.options?.batch_size ?? 100,
-    skip_header: opts.options?.skip_header ?? true,
-    update_existing: opts.options?.update_existing ?? true,
-  };
-
-  files[`${name}/import.php`] = generateImportClass(name, Name, fields, options);
-  files[`${name}/export.php`] = generateExportClass(name, Name, fields, options);
-
-  if (options.use_csv || options.use_xlsx) {
-    files[`${name}/import.form.php`] = generateImportForm(name, Name, fields, options);
-  }
-
-  if (options.use_json) {
-    files[`${name}/api.import.php`] = generateApiImport(name, Name, fields, options);
-  }
-
+/**
+ * Normalizes field with label defaults
+ */
+function normalizeField(f: ImportExportField): ImportExportField {
   return {
-    addon_name: name,
-    fields_count: fields.length,
-    options,
-    files,
+    field: f.field,
+    type: f.type,
+    label: f.label || f.field,
+    required: f.required ?? false,
+    default: f.default,
+    options: f.options,
   };
 }
 
+/**
+ * Generates import class
+ */
 function generateImportClass(
   name: string,
   Name: string,
   fields: ImportExportField[],
-  options: any
+  options: Record<string, unknown>
 ): string {
   const fieldParsing = fields
     .map(f => {
       switch (f.type) {
         case 'number':
-          return `        '${f.field}' => isset($row['${f.label || f.field}']) ? floatval($row['${f.label || f.field}']) : null,`;
+          return `        '${f.field}' => isset($row['${f.label}']) ? floatval($row['${f.label}']) : null,`;
         case 'bool':
-          return `        '${f.field}' => isset($row['${f.label || f.field}']) ? (in_array(strtolower($row['${f.label || f.field}']), ['1', 'yes', 'true', 'да'], true) ? 1 : 0) : 0,`;
+          return `        '${f.field}' => isset($row['${f.label}']) ? (in_array(strtolower($row['${f.label}']), ['1', 'yes', 'true', 'да'], true) ? 1 : 0) : 0,`;
         case 'date':
-          return `        '${f.field}' => isset($row['${f.label || f.field}']) ? date('Y-m-d', strtotime($row['${f.label || f.field}'])) : null,`;
+          return `        '${f.field}' => isset($row['${f.label}']) ? date('Y-m-d', strtotime($row['${f.label}'])) : null,`;
         case 'datetime':
-          return `        '${f.field}' => isset($row['${f.label || f.field}']) ? date('Y-m-d H:i:s', strtotime($row['${f.label || f.field}'])) : null,`;
+          return `        '${f.field}' => isset($row['${f.label}']) ? date('Y-m-d H:i:s', strtotime($row['${f.label}'])) : null,`;
         case 'select':
-          return `        '${f.field}' => $row['${f.label || f.field}'] ?? null,`;
+          return `        '${f.field}' => \\$row['${f.label}'] ?? null,`;
         default:
-          return `        '${f.field}' => $row['${f.label || f.field}'] ?? null,`;
+          return `        '${f.field}' => \\$row['${f.label}'] ?? null,`;
       }
     })
     .join('\n');
@@ -87,7 +113,7 @@ function generateImportClass(
   const validation = fields
     .filter(f => f.required)
     .map(f => {
-      return `            if (empty($item['${f.field}'])) {
+      return `            if (empty(\\$item['${f.field}'])) {
                 throw new Exception('Поле ${f.label || f.field} обязательно для заполнения');
             }`;
     })
@@ -106,7 +132,7 @@ class ${Name}Import {
         'skipped' => 0,
         'errors' => 0,
     ];
-    
+
     public function __construct($options = []) {
         $this->model = cmsModel::getInstance();
         $this->options = array_merge([
@@ -115,23 +141,23 @@ class ${Name}Import {
             'update_existing' => ${options.update_existing},
         ], $options);
     }
-    
+
     public function importFromArray($data) {
         $this->stats['total'] = count($data);
-        
+
         if ($this->options['skip_header'] && !empty($data[0])) {
             array_shift($data);
         }
-        
+
         $batches = array_chunk($data, $this->options['batch_size']);
-        
+
         foreach ($batches as $batch) {
             $this->processBatch($batch);
         }
-        
+
         return $this->stats;
     }
-    
+
     private function processBatch($rows) {
         foreach ($rows as $row) {
             try {
@@ -144,14 +170,14 @@ class ${Name}Import {
             }
         }
     }
-    
+
     private function importRow($row) {
         $item = [
 ${fieldParsing}
         ];
-        
+
 ${validation}
-        
+
         if ($this->options['update_existing'] && !empty($item['slug'])) {
             $existing = $this->model->getItem('${name}', ['slug' => $item['slug']]);
             if ($existing) {
@@ -160,42 +186,42 @@ ${validation}
                 return;
             }
         }
-        
+
         $id = $this->model->insert('${name}', $item);
-        
+
         if ($id) {
             $this->stats['imported']++;
         } else {
             $this->stats['skipped']++;
         }
     }
-    
+
     public function getStats() {
         return $this->stats;
     }
-    
+
     public function validateCsv($content) {
         $lines = explode("\\n", trim($content));
         if (empty($lines)) {
             throw new Exception('Пустой файл');
         }
-        
+
         $delimiter = $this->detectDelimiter($content);
         $rows = [];
-        
+
         foreach ($lines as $line) {
             $rows[] = str_getcsv($line, $delimiter);
         }
-        
+
         return $rows;
     }
-    
+
     private function detectDelimiter($content) {
         $firstLine = explode("\\n", $content)[0];
         $commas = substr_count($firstLine, ',');
         $semicolons = substr_count($firstLine, ';');
         $tabs = substr_count($firstLine, "\\t");
-        
+
         if ($tabs > $commas && $tabs > $semicolons) {
             return "\\t";
         }
@@ -207,17 +233,20 @@ ${validation}
 }`;
 }
 
+/**
+ * Generates export class
+ */
 function generateExportClass(
   name: string,
   Name: string,
   fields: ImportExportField[],
-  _options: any
+  _options: Record<string, unknown>
 ): string {
   const fieldHeaders = fields.map(f => `'${f.label || f.field}'`).join(', ');
 
   const fieldMapping = fields
     .map(f => {
-      return `            '${f.field}' => $item['${f.field}'],`;
+      return `            '${f.field}' => \\$item['${f.field}'],`;
     })
     .join('\n');
 
@@ -227,59 +256,57 @@ function generateExportClass(
 class ${Name}Export {
     private $model;
     private $options = [];
-    
+
     public function __construct($options = []) {
         $this->model = cmsModel::getInstance();
         $this->options = $options;
     }
-    
+
     public function exportToArray($filters = []) {
         $items = $this->getItems($filters);
         $result = [];
-        
-        // Header row
+
         $result[] = [${fieldHeaders}];
-        
-        // Data rows
+
         foreach ($items as $item) {
             $result[] = [
 ${fieldMapping}
             ];
         }
-        
+
         return $result;
     }
-    
+
     public function exportToCsv($filters = []) {
         $data = $this->exportToArray($filters);
-        
+
         if (empty($data)) {
             return '';
         }
-        
+
         $output = fopen('php://temp', 'r+');
-        
+
         foreach ($data as $row) {
             fputcsv($output, $row);
         }
-        
+
         rewind($output);
         $csv = stream_get_contents($output);
         fclose($output);
-        
+
         return $csv;
     }
-    
+
     public function exportToJson($filters = []) {
         $items = $this->getItems($filters);
         return json_encode($items, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     }
-    
+
     public function exportToXml($filters = []) {
         $items = $this->getItems($filters);
-        
+
         $xml = new SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><${name}_list></${name}_list>');
-        
+
         foreach ($items as $item) {
             $itemXml = $xml->addChild('item');
             foreach ($item as $key => $value) {
@@ -289,15 +316,15 @@ ${fieldMapping}
                 $itemXml->addChild($key, htmlspecialchars($value));
             }
         }
-        
+
         return $xml->asXML();
     }
-    
+
     private function getItems($filters = []) {
         $query = $this->model->get('${name}', null, function ($model, $item) {
             return $item;
         });
-        
+
         if (!empty($filters)) {
             foreach ($filters as $key => $value) {
                 if ($value !== null && $value !== '') {
@@ -305,13 +332,13 @@ ${fieldMapping}
                 }
             }
         }
-        
+
         $page = $this->options['page'] ?? 1;
         $per_page = $this->options['per_page'] ?? 100;
-        
+
         return $query->orderBy('id', 'DESC')->limit($page, $per_page)->fetchAll();
     }
-    
+
     public function getTotalCount($filters = []) {
         return $this->model->getCount('${name}', function ($model) use ($filters) {
             if (!empty($filters)) {
@@ -326,11 +353,14 @@ ${fieldMapping}
 }`;
 }
 
+/**
+ * Generates import form class
+ */
 function generateImportForm(
   name: string,
   Name: string,
-  fields: ImportExportField[],
-  options: any
+  _fields: ImportExportField[],
+  options: Record<string, unknown>
 ): string {
   return `<?php
 // InstantCMS 2. ${name}/import.form.php
@@ -342,15 +372,15 @@ class ${Name}ImportForm {
             'max_size' => 10 * 1024 * 1024,
             'required' => true,
         ]));
-        
+
         $form->addField('update_existing', new fieldCheckbox('Обновлять существующие записи', [
             'is_checked' => ${options.update_existing},
         ]));
-        
+
         $form->addField('skip_header', new fieldCheckbox('Пропустить первую строку (заголовки)', [
             'is_checked' => ${options.skip_header},
         ]));
-        
+
         $form->addField('encoding', new fieldList('Кодировка файла', [
             'options' => [
                 'utf-8' => 'UTF-8',
@@ -360,18 +390,21 @@ class ${Name}ImportForm {
             'default' => 'utf-8',
         ]));
     }
-    
+
     public static function create($form) {
         return new self($form);
     }
 }`;
 }
 
+/**
+ * Generates API import/export controller
+ */
 function generateApiImport(
   name: string,
   Name: string,
-  fields: ImportExportField[],
-  options: any
+  _fields: ImportExportField[],
+  options: Record<string, unknown>
 ): string {
   return `<?php
 // InstantCMS 2. ${name}/api.import.php
@@ -380,27 +413,27 @@ class ${Name}ApiImport {
     public function __construct($controller) {
         $this->controller = $controller;
     }
-    
+
     public function actionImport() {
         $request = $this->controller->request;
-        
+
         $data = $request->get('data');
         if (empty($data)) {
             $this->controller->halt(400, json_encode(['error' => 'No data provided']));
         }
-        
+
         if (is_string($data)) {
             $data = json_decode($data, true);
         }
-        
+
         if (!is_array($data)) {
             $this->controller->halt(400, json_encode(['error' => 'Invalid data format']));
         }
-        
+
         $import = new ${Name}Import([
             'update_existing' => $request->get('update_existing', ${options.update_existing}),
         ]);
-        
+
         try {
             $stats = $import->importFromArray($data);
             $this->controller->halt(200, json_encode([
@@ -413,19 +446,19 @@ class ${Name}ApiImport {
             ]));
         }
     }
-    
+
     public function actionExport() {
         $request = $this->controller->request;
         $format = $request->get('format', 'json');
-        
+
         $filters = [];
         $filters['is_published'] = $request->get('published', null);
-        
+
         $export = new ${Name}Export([
             'page' => $request->get('page', 1),
             'per_page' => $request->get('per_page', 100),
         ]);
-        
+
         switch ($format) {
             case 'csv':
                 $content = $export->exportToCsv($filters);
@@ -440,32 +473,31 @@ class ${Name}ApiImport {
                 $this->controller->halt(200, $content);
         }
     }
-    
+
     public function actionValidate() {
         $request = $this->controller->request;
         $data = $request->get('data');
-        
+
         if (empty($data)) {
             $this->controller->halt(400, json_encode(['error' => 'No data provided']));
         }
-        
+
         if (is_string($data)) {
             $data = json_decode($data, true);
         }
-        
+
         $errors = [];
         $rowNum = 0;
-        
+
         foreach ($data as $row) {
             $rowNum++;
             foreach ($row as $key => $value) {
-                // Basic validation
                 if (empty($value) && in_array($key, ['title', 'name'])) {
                     $errors[] = "Row {$rowNum}: Field '{$key}' is required";
                 }
             }
         }
-        
+
         if (empty($errors)) {
             $this->controller->halt(200, json_encode([
                 'valid' => true,
@@ -479,6 +511,79 @@ class ${Name}ApiImport {
         }
     }
 }`;
+}
+
+/**
+ * Generates a complete import/export system for an InstantCMS addon
+ *
+ * @param opts - Configuration options for import/export
+ * @returns Object containing generated files and metadata
+ *
+ * @example
+ * ```typescript
+ * const result = scaffoldImportExport({
+ *   addon_name: 'products',
+ *   fields: [
+ *     { field: 'title', type: 'string', label: 'Название', required: true },
+ *     { field: 'price', type: 'number', label: 'Цена' }
+ *   ],
+ *   options: { use_csv: true, use_json: true, batch_size: 100 }
+ * });
+ * ```
+ */
+export function scaffoldImportExport(opts: ScaffoldImportExportOptions): ScaffoldResult {
+  const { lowercase, UpperCamelCase } = normalizeAddonName(opts.addon_name);
+  const files: Record<string, string> = {};
+
+  const fields = opts.fields.map(normalizeField);
+
+  const options = {
+    use_csv: opts.options?.use_csv ?? true,
+    use_xlsx: opts.options?.use_xlsx ?? true,
+    use_json: opts.options?.use_json ?? true,
+    use_xml: opts.options?.use_xml ?? false,
+    batch_size: opts.options?.batch_size ?? 100,
+    skip_header: opts.options?.skip_header ?? true,
+    update_existing: opts.options?.update_existing ?? true,
+  };
+
+  files[`${lowercase}/import.php`] = generateImportClass(
+    lowercase,
+    UpperCamelCase,
+    fields,
+    options
+  );
+  files[`${lowercase}/export.php`] = generateExportClass(
+    lowercase,
+    UpperCamelCase,
+    fields,
+    options
+  );
+
+  if (options.use_csv || options.use_xlsx) {
+    files[`${lowercase}/import.form.php`] = generateImportForm(
+      lowercase,
+      UpperCamelCase,
+      fields,
+      options
+    );
+  }
+
+  if (options.use_json) {
+    files[`${lowercase}/api.import.php`] = generateApiImport(
+      lowercase,
+      UpperCamelCase,
+      fields,
+      options
+    );
+  }
+
+  return {
+    addon_name: lowercase,
+    files,
+    fields_count: fields.length,
+    options,
+  };
 }
 
 export const importExportToolSchema = {

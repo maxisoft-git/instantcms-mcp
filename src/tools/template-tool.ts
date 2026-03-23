@@ -1,76 +1,51 @@
-import { z } from 'zod';
+/**
+ * @fileoverview Template scaffolding tool for InstantCMS
+ * Generates complete templates with layouts, styles, and dark mode support
+ */
 
+import { z } from 'zod';
+import { normalizeAddonName, type ScaffoldResult } from '../types/scaffold';
+
+/**
+ * Single layout block definition
+ */
 interface LayoutBlock {
+  /** Block name */
   name: string;
+  /** Widget position */
   position: string;
+  /** CSS class */
   class?: string;
 }
 
+/**
+ * Options for template generation
+ */
 interface ScaffoldTemplateOptions {
+  /** Template name */
   template_name: string;
+  /** Additional configuration */
   options?: {
+    /** Generate layout.yaml */
     with_layout?: boolean;
+    /** Enable responsive design */
     with_responsive?: boolean;
+    /** Enable dark mode support */
     with_dark_mode?: boolean;
+    /** Enable RTL support */
     withRTL?: boolean;
   };
+  /** Layout blocks */
   layout_blocks?: LayoutBlock[];
 }
 
-export function scaffoldTemplate(opts: ScaffoldTemplateOptions): object {
-  const name = opts.template_name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-  const Name = name
-    .split('_')
-    .map(s => s.charAt(0).toUpperCase() + s.slice(1))
-    .join('');
-  const files: Record<string, string> = {};
-
-  const options = {
-    with_layout: opts.options?.with_layout ?? true,
-    with_responsive: opts.options?.with_responsive ?? true,
-    with_dark_mode: opts.options?.with_dark_mode ?? false,
-    withRTL: opts.options?.withRTL ?? false,
-  };
-
-  const layout_blocks = opts.layout_blocks || [
-    { name: 'header', position: 'top', class: 'bg-white' },
-    { name: 'navbar', position: 'nav', class: 'navbar-expand-lg' },
-    { name: 'content', position: 'content', class: 'main-content' },
-    { name: 'sidebar', position: 'right', class: 'sidebar' },
-    { name: 'footer', position: 'bottom', class: 'bg-light' },
-  ];
-
-  files[`${name}/manifest.json`] = generateManifest(name, Name, options);
-  files[`${name}/main.tpl.php`] = generateMainTemplate(name, Name, layout_blocks, options);
-  files[`${name}/main.css`] = generateMainCSS(name, options);
-  files[`${name}/variables.json`] = generateVariables(name, Name);
-
-  if (options.with_layout) {
-    files[`${name}/layout.yaml`] = generateLayoutYAML(name, layout_blocks);
-  }
-
-  files[`${name}/header.tpl.php`] = generateHeaderTemplate(name, Name);
-  files[`${name}/footer.tpl.php`] = generateFooterTemplate(name, Name);
-  files[`${name}/sidebar.tpl.php`] = generateSidebarTemplate(name, Name);
-
-  files[`${name}/assets/js/app.js`] = generateJS(name);
-  files[`${name}/assets/css/components.css`] = generateComponentsCSS(name, options);
-
-  if (options.with_dark_mode) {
-    files[`${name}/dark.css`] = generateDarkModeCSS(name);
-  }
-
-  return {
-    template_name: name,
-    options,
-    blocks_count: layout_blocks.length,
-    files,
-  };
-}
-
-function generateManifest(name: string, Name: string, options: any): string {
+/**
+ * Generates template manifest
+ */
+function generateManifest(name: string, Name: string, options: Record<string, boolean>): string {
   return `<?php
 // InstantCMS 2. manifest.json
+
 return [
     'type' => 'template',
     'name' => '${name}',
@@ -110,12 +85,21 @@ return [
 ];`;
 }
 
+/**
+ * Generates main template file
+ */
 function generateMainTemplate(
   name: string,
-  Name: string,
+  _Name: string,
   blocks: LayoutBlock[],
-  options: any
+  options: Record<string, boolean>
 ): string {
+  const headerClass = blocks.find(b => b.name === 'header')?.class || 'bg-white';
+  const navbarClass =
+    blocks.find(b => b.name === 'navbar')?.class || 'navbar navbar-expand-lg navbar-light bg-white';
+  const contentClass = blocks.find(b => b.name === 'content')?.class || 'py-4';
+  const footerClass = blocks.find(b => b.name === 'footer')?.class || 'bg-light py-4';
+
   return `<?php
 // InstantCMS 2. ${name}/main.tpl.php
 
@@ -136,39 +120,37 @@ function generateMainTemplate(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    
+
     <title><?php echo \\$page_title; ?></title>
     <meta name="description" content="<?php echo \\$page_description ?? ''; ?>">
-    
+
     <?php echo \\$template->getHead(); ?>
-    
-    <!-- Main CSS -->
+
     <link rel="stylesheet" href="<?php echo \\$template->getAssetUrl('main.css'); ?>">
-    
+
     <?php if (${options.with_dark_mode}): ?>
-    <!-- Dark Mode CSS -->
     <link rel="stylesheet" href="<?php echo \\$template->getAssetUrl('dark.css'); ?>" media="(prefers-color-scheme: dark)">
     <?php endif; ?>
 </head>
 <body class="<?php echo implode(' ', \\$body_class); ?>">
-    
+
     <div id="wrapper" class="<?php echo \\$template->getLayoutClass(); ?>">
-        
+
         <?php echo \\$widgets->renderPosition('top'); ?>
-        
-        <header id="header" class="<?php echo '${blocks.find(b => b.name === 'header')?.class || 'bg-white'}'; ?>">
+
+        <header id="header" class="${headerClass}">
             <div class="container">
                 <?php echo \\$widgets->renderPosition('header'); ?>
             </div>
         </header>
-        
-        <nav id="navbar" class="<?php echo '${blocks.find(b => b.name === 'navbar')?.class || 'navbar navbar-expand-lg navbar-light bg-white'}'; ?>">
+
+        <nav id="navbar" class="${navbarClass}">
             <div class="container">
                 <?php echo \\$widgets->renderPosition('nav'); ?>
             </div>
         </nav>
-        
-        <main id="main-content" class="<?php echo '${blocks.find(b => b.name === 'content')?.class || 'py-4'}'; ?>">
+
+        <main id="main-content" class="${contentClass}">
             <div class="container">
                 <div class="row">
                     <div class="col-lg-8">
@@ -181,8 +163,8 @@ function generateMainTemplate(
                 </div>
             </div>
         </main>
-        
-        <footer id="footer" class="<?php echo '${blocks.find(b => b.name === 'footer')?.class || 'bg-light py-4'}'; ?>">
+
+        <footer id="footer" class="${footerClass}">
             <div class="container">
                 <?php echo \\$widgets->renderPosition('footer'); ?>
                 <div class="text-center text-muted">
@@ -190,22 +172,23 @@ function generateMainTemplate(
                 </div>
             </div>
         </footer>
-        
+
     </div>
-    
-    <!-- JS -->
+
     <script src="<?php echo \\$template->getAssetUrl('assets/js/app.js'); ?>"></script>
-    
+
     <?php echo \\$template->getBodyEnd(); ?>
 </body>
 </html>
 `;
 }
 
-function generateMainCSS(name: string, options: any): string {
+/**
+ * Generates main CSS file
+ */
+function generateMainCSS(name: string, options: Record<string, boolean>): string {
   return `/* InstantCMS 2. ${name} - Main Styles */
 
-/* Variables */
 :root {
     --color-primary: #007bff;
     --color-secondary: #6c757d;
@@ -213,22 +196,17 @@ function generateMainCSS(name: string, options: any): string {
     --color-danger: #dc3545;
     --color-warning: #ffc107;
     --color-info: #17a2b8;
-    
     --font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-size-base: 1rem;
     --line-height-base: 1.5;
-    
     --border-radius: 0.25rem;
     --border-color: #dee2e6;
-    
     --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
     --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
     --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
-    
     --transition-base: all 0.2s ease-in-out;
 }
 
-/* Reset */
 *, *::before, *::after {
     box-sizing: border-box;
 }
@@ -247,7 +225,6 @@ body {
     background-color: #fff;
 }
 
-/* Typography */
 h1, h2, h3, h4, h5, h6 {
     margin: 0 0 0.5rem 0;
     font-weight: 500;
@@ -267,7 +244,6 @@ a:hover {
     text-decoration: underline;
 }
 
-/* Layout */
 #wrapper {
     min-height: 100vh;
     display: flex;
@@ -286,26 +262,22 @@ a:hover {
     padding: 0 15px;
 }
 
-/* Header */
 #header {
     padding: 1rem 0;
     border-bottom: 1px solid var(--border-color);
 }
 
-/* Navbar */
 #navbar {
     padding: 0.5rem 0;
     border-bottom: 1px solid var(--border-color);
 }
 
-/* Footer */
 #footer {
     margin-top: auto;
     padding: 2rem 0;
     border-top: 1px solid var(--border-color);
 }
 
-/* Grid */
 .row {
     display: flex;
     flex-wrap: wrap;
@@ -327,7 +299,6 @@ a:hover {
     max-width: 33.333333%;
 }
 
-/* Responsive */
 <?php if (${options.with_responsive}): ?>
 @media (max-width: 991px) {
     .col-lg-8,
@@ -338,17 +309,18 @@ a:hover {
 }
 <?php endif; ?>
 
-/* Utilities */
 .text-center { text-align: center; }
 .text-muted { color: #6c757d; }
 .bg-light { background-color: #f8f9fa; }
 .bg-white { background-color: #fff; }
 .py-4 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
-.py-4 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
 .mb-3 { margin-bottom: 1rem; }
 `;
 }
 
+/**
+ * Generates variables JSON
+ */
 function generateVariables(name: string, Name: string): string {
   return JSON.stringify(
     {
@@ -386,6 +358,9 @@ function generateVariables(name: string, Name: string): string {
   );
 }
 
+/**
+ * Generates layout YAML
+ */
 function generateLayoutYAML(name: string, blocks: LayoutBlock[]): string {
   const rows = blocks
     .map((b, i) => {
@@ -405,6 +380,9 @@ ${rows}
 `;
 }
 
+/**
+ * Generates header template
+ */
 function generateHeaderTemplate(name: string, _Name: string): string {
   return `<?php
 // InstantCMS 2. ${name}/header.tpl.php
@@ -417,7 +395,7 @@ function generateHeaderTemplate(name: string, _Name: string): string {
         <a href="<?php echo \\$config->root_url; ?>" class="logo">
             <?php echo \\$config->sitename; ?>
         </a>
-        
+
         <nav class="header-nav">
             <?php echo \\$template->renderMenu('header'); ?>
         </nav>
@@ -426,6 +404,9 @@ function generateHeaderTemplate(name: string, _Name: string): string {
 `;
 }
 
+/**
+ * Generates footer template
+ */
 function generateFooterTemplate(name: string, _Name: string): string {
   return `<?php
 // InstantCMS 2. ${name}/footer.tpl.php
@@ -437,7 +418,7 @@ function generateFooterTemplate(name: string, _Name: string): string {
         <div class="footer-copyright">
             &copy; <?php echo date('Y'); ?> <?php echo \\$config->sitename; ?>
         </div>
-        
+
         <nav class="footer-nav">
             <?php echo cmsTemplate::getInstance()->renderMenu('footer'); ?>
         </nav>
@@ -446,6 +427,9 @@ function generateFooterTemplate(name: string, _Name: string): string {
 `;
 }
 
+/**
+ * Generates sidebar template
+ */
 function generateSidebarTemplate(name: string, _Name: string): string {
   return `<?php
 // InstantCMS 2. ${name}/sidebar.tpl.php
@@ -458,26 +442,25 @@ function generateSidebarTemplate(name: string, _Name: string): string {
 `;
 }
 
+/**
+ * Generates JavaScript file
+ */
 function generateJS(name: string): string {
   return `// InstantCMS 2. ${name} - Main JavaScript
 
 (function() {
     'use strict';
-    
-    // DOM Ready
+
     document.addEventListener('DOMContentLoaded', function() {
         console.log('${name} template loaded');
-        
-        // Initialize components
+
         initNavigation();
         initDarkMode();
     });
-    
-    // Navigation
+
     function initNavigation() {
         const nav = document.querySelector('.navbar');
         if (nav) {
-            // Navbar scroll effect
             window.addEventListener('scroll', function() {
                 if (window.scrollY > 50) {
                     nav.classList.add('scrolled');
@@ -487,8 +470,7 @@ function generateJS(name: string): string {
             });
         }
     }
-    
-    // Dark Mode Toggle
+
     function initDarkMode() {
         const toggle = document.querySelector('[data-theme-toggle]');
         if (toggle) {
@@ -497,22 +479,23 @@ function generateJS(name: string): string {
                 const isDark = document.body.classList.contains('dark-mode');
                 localStorage.setItem('darkMode', isDark);
             });
-            
-            // Check saved preference
+
             if (localStorage.getItem('darkMode') === 'true') {
                 document.body.classList.add('dark-mode');
             }
         }
     }
-    
+
 })();
 `;
 }
 
-function generateComponentsCSS(name: string, _options: any): string {
+/**
+ * Generates components CSS
+ */
+function generateComponentsCSS(name: string, _options: Record<string, boolean>): string {
   return `/* InstantCMS 2. ${name} - Component Styles */
 
-/* Buttons */
 .btn {
     display: inline-block;
     padding: 0.375rem 0.75rem;
@@ -539,7 +522,6 @@ function generateComponentsCSS(name: string, _options: any): string {
     border-color: #0056b3;
 }
 
-/* Cards */
 .card {
     position: relative;
     flex-direction: column;
@@ -555,7 +537,6 @@ function generateComponentsCSS(name: string, _options: any): string {
     padding: 1.25rem;
 }
 
-/* Forms */
 .form-group {
     margin-bottom: 1rem;
 }
@@ -578,7 +559,6 @@ function generateComponentsCSS(name: string, _options: any): string {
     outline: 0;
 }
 
-/* Alerts */
 .alert {
     position: relative;
     padding: 0.75rem 1.25rem;
@@ -595,6 +575,9 @@ function generateComponentsCSS(name: string, _options: any): string {
 `;
 }
 
+/**
+ * Generates dark mode CSS
+ */
 function generateDarkModeCSS(name: string): string {
   return `/* InstantCMS 2. ${name} - Dark Mode Styles */
 
@@ -607,37 +590,37 @@ function generateDarkModeCSS(name: string): string {
         --color-warning: #fcc419;
         --color-info: #22b8cf;
     }
-    
+
     body {
         color: #dee2e6;
         background-color: #1a1a1a;
     }
-    
+
     #header,
     #navbar {
         background-color: #2d2d2d !important;
         border-color: #404040 !important;
     }
-    
+
     #footer {
         background-color: #2d2d2d !important;
         border-color: #404040 !important;
     }
-    
+
     .bg-light,
     .bg-white {
         background-color: #2d2d2d !important;
     }
-    
+
     .text-muted {
         color: #868e96 !important;
     }
-    
+
     .card {
         background-color: #2d2d2d;
         border-color: #404040;
     }
-    
+
     .form-control {
         color: #dee2e6;
         background-color: #323232;
@@ -645,6 +628,73 @@ function generateDarkModeCSS(name: string): string {
     }
 }
 `;
+}
+
+/**
+ * Generates a complete template for InstantCMS
+ *
+ * @param opts - Configuration options for the template
+ * @returns Object containing generated files and metadata
+ *
+ * @example
+ * ```typescript
+ * const result = scaffoldTemplate({
+ *   template_name: 'mytheme',
+ *   options: { with_layout: true, with_responsive: true, with_dark_mode: true }
+ * });
+ * ```
+ */
+export function scaffoldTemplate(opts: ScaffoldTemplateOptions): ScaffoldResult {
+  const { lowercase, UpperCamelCase } = normalizeAddonName(opts.template_name);
+  const files: Record<string, string> = {};
+
+  const options = {
+    with_layout: opts.options?.with_layout ?? true,
+    with_responsive: opts.options?.with_responsive ?? true,
+    with_dark_mode: opts.options?.with_dark_mode ?? false,
+    withRTL: opts.options?.withRTL ?? false,
+  };
+
+  const layout_blocks = opts.layout_blocks || [
+    { name: 'header', position: 'top', class: 'bg-white' },
+    { name: 'navbar', position: 'nav', class: 'navbar-expand-lg' },
+    { name: 'content', position: 'content', class: 'main-content' },
+    { name: 'sidebar', position: 'right', class: 'sidebar' },
+    { name: 'footer', position: 'bottom', class: 'bg-light' },
+  ];
+
+  files[`${lowercase}/manifest.json`] = generateManifest(lowercase, UpperCamelCase, options);
+  files[`${lowercase}/main.tpl.php`] = generateMainTemplate(
+    lowercase,
+    UpperCamelCase,
+    layout_blocks,
+    options
+  );
+  files[`${lowercase}/main.css`] = generateMainCSS(lowercase, options);
+  files[`${lowercase}/variables.json`] = generateVariables(lowercase, UpperCamelCase);
+
+  if (options.with_layout) {
+    files[`${lowercase}/layout.yaml`] = generateLayoutYAML(lowercase, layout_blocks);
+  }
+
+  files[`${lowercase}/header.tpl.php`] = generateHeaderTemplate(lowercase, UpperCamelCase);
+  files[`${lowercase}/footer.tpl.php`] = generateFooterTemplate(lowercase, UpperCamelCase);
+  files[`${lowercase}/sidebar.tpl.php`] = generateSidebarTemplate(lowercase, UpperCamelCase);
+
+  files[`${lowercase}/assets/js/app.js`] = generateJS(lowercase);
+  files[`${lowercase}/assets/css/components.css`] = generateComponentsCSS(lowercase, options);
+
+  if (options.with_dark_mode) {
+    files[`${lowercase}/dark.css`] = generateDarkModeCSS(lowercase);
+  }
+
+  return {
+    addon_name: lowercase,
+    files,
+    template_name: lowercase,
+    options,
+    blocks_count: layout_blocks.length,
+  };
 }
 
 export const templateToolSchema = {
